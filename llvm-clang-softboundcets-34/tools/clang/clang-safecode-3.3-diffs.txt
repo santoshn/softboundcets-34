@@ -1,0 +1,534 @@
+diff --recursive cfe-3.3.src/include/clang/Driver/CC1Options.td safecode/safecode-33/tools/clang/include/clang/Driver/CC1Options.td
+534a535,550
+> // Memory Safety Options
+> //===----------------------------------------------------------------------===//
+> 
+> def memsafety : Flag<["-"], "fmemsafety">,
+>   HelpText<"Instrument program with memory-safety checks">;
+    > def bbc : Flag<["-"], "bbc">,
+>   HelpText<"Use Baggy Bounds Checking">;
+> def msLogFile : Separate<["-"], "fmemsafety-logfile">,
+>     MetaVarName<"<path>">, HelpText<"Specify memory safety checks log file">;
+> def terminate : Flag<["-"], "fmemsafety-terminate">,
+>  HelpText<"Terminate program on failed memory-safety checks">;
+> def softbound: Flag<["-"], "fsoftbound">,
+>  HelpText<"Instrument program with SoftBound+CETS style pointer based memory safety checks">;
+> 
+> 
+> //===----------------------------------------------------------------------===//
+diff --recursive cfe-3.3.src/include/clang/Frontend/CodeGenOptions.def safecode/safecode-33/tools/clang/include/clang/Frontend/CodeGenOptions.def
+107a108,113
+> CODEGENOPT(MemSafety         , 1, 0) /// Instrument code with memory safety checks
+> CODEGENOPT(BaggyBounds       , 1, 0) /// Use Baggy Bounds Checking
+> CODEGENOPT(MemSafeTerminate  , 1, 0) /// Terminate program on failed memsafe checks
+> CODEGENOPT(SoftBound         , 1, 0) /// SoftBound+CETS pointer based checking
+> 
+> 
+diff --recursive cfe-3.3.src/include/clang/Frontend/CodeGenOptions.h safecode/safecode-33/tools/clang/include/clang/Frontend/CodeGenOptions.h
+124a125,127
+>   /// The filename to use for logging memory safety violations
+>   std::string MemSafetyLogFile;
+> 
+diff --recursive cfe-3.3.src/lib/Basic/Version.cpp safecode/safecode-33/tools/clang/lib/Basic/Version.cpp
+39c39
+<   static StringRef SVNRepository("$URL: https://llvm.org/svn/llvm-project/cfe/tags/RELEASE_33/final/lib/Basic/Version.cpp $");
+---
+>   static StringRef SVNRepository("$URL: http://llvm.org/svn/llvm-project/safecode/trunk/tools/clang/lib/Basic/Version.cpp $");
+diff --recursive cfe-3.3.src/lib/CodeGen/BackendUtil.cpp safecode/safecode-33/tools/clang/lib/CodeGen/BackendUtil.cpp
+38a39,63
+> 
+> #include "llvm/Transforms/Utils/UnifyFunctionExitNodes.h"
+> 
+> #include "CommonMemorySafetyPasses.h"
+> #include "safecode/ArrayBoundsCheck.h"
+> #include "safecode/BaggyBoundsChecks.h"
+> #include "safecode/CFIChecks.h"
+> #include "safecode/CStdLib.h"
+> #include "safecode/DebugInstrumentation.h"
+> #include "safecode/FormatStrings.h"
+> #include "safecode/InitAllocas.h"
+> #include "safecode/InvalidFreeChecks.h"
+> #include "safecode/GEPChecks.h"
+> #include "safecode/LoggingFunctions.h"
+> #include "safecode/OptimizeChecks.h"
+> #include "safecode/RegisterBounds.h"
+> #include "safecode/RegisterRuntimeInitializer.h"
+> #include "safecode/RewriteOOB.h"
+> #include "safecode/SAFECodeMSCInfo.h"
+> #include "safecode/SAFECodePasses.h"
+> #include "safecode/SpecializeCMSCalls.h"
+> #include "SoftBound/InitializeSoftBound.h"
+> #include "SoftBound/SoftBoundCETSPass.h"
+> 
+> 
+321a347,354
+>   // Add the memory safety passes for control-flow integrity
+>   if (CodeGenOpts.MemSafety) {
+>     // Make sure everything that can be in an LLVM register is.
+>     MPM->add (createPromoteMemoryToRegisterPass());
+>     MPM->add (createUnifyFunctionExitNodesPass());
+>     MPM->add (new CFIChecks());
+>   }
+> 
+322a356,425
+> 
+>   if (CodeGenOpts.SoftBound) {
+>     // Make sure SoftBound+CETS is run after optimization with atleast mem2reg run 
+>     MPM->add(new DominatorTree());
+>     MPM->add(new DominanceFrontier());
+>     MPM->add(new LoopInfo());
+>     MPM->add(new InitializeSoftBound());
+>     MPM->add(new SoftBoundCETSPass());
+>   }
+> 
+>   // Add the memory safety passes
+>   if (CodeGenOpts.MemSafety) {
+>     //
+>     // Add passes that record information about run-time checks.
+>     //
+>     MPM->add (createCommonMSCInfoPass());
+>     MPM->add (createSAFECodeMSCInfoPass());
+> 
+>     // C standard library / format string function transforms
+>     MPM->add (new StringTransform());
+>     if (!CodeGenOpts.BaggyBounds) {
+>       MPM->add (new FormatStringTransform());
+>       MPM->add (new RegisterVarargCallSites());
+>       MPM->add (new LoggingFunctions());
+>     }
+> 
+>     MPM->add (new InitAllocas());
+>     MPM->add (new RegisterGlobalVariables());
+>     MPM->add (new RegisterMainArgs());
+>     MPM->add (new InsertFreeChecks());
+>     MPM->add (new RegisterCustomizedAllocation());
+>     MPM->add (new RegisterFunctionByvalArguments ());
+>     MPM->add (new LoopInfo ());
+>     MPM->add (new DominatorTree ());
+>     MPM->add (new DominanceFrontier ());
+>     MPM->add (new RegisterStackObjPass ());
+>     MPM->add (new RegisterRuntimeInitializer(CodeGenOpts.MemSafetyLogFile.c_str()));
+>     MPM->add (new DebugInstrument());
+>     MPM->add (createInstrumentMemoryAccessesPass());
+>     MPM->add (new ScalarEvolution());
+>     MPM->add (new ArrayBoundsCheckLocal());
+>     MPM->add (new InsertGEPChecks());
+>     MPM->add (createSpecializeCMSCallsPass());
+>     MPM->add (createExactCheckOptPass());
+> 
+>     MPM->add (new DominatorTree());
+>     MPM->add (new ScalarEvolution());
+>     MPM->add (createOptimizeImpliedFastLSChecksPass());
+> 
+>     MPM->add (new OptimizeChecks());
+>     if (CodeGenOpts.MemSafeTerminate) {
+>       MPM->add (llvm::createSCTerminatePass ());
+>     }
+>   }
+> 
+>   if (CodeGenOpts.BaggyBounds) {
+>     MPM->add (new InsertBaggyBoundsChecks());
+>   }
+> 
+>   //
+>   // Rerun the LLVM optimizations again.
+>   //
+>   PMBuilder.populateModulePassManager(*MPM);
+> 
+>   // For SAFECode, do the debug instrumentation and OOB rewriting after
+>   // all optimization is done.
+>   if (CodeGenOpts.MemSafety) {
+>     MPM->add (new DebugInstrument());
+>     MPM->add (new RewriteOOB());
+>   }
+diff --recursive cfe-3.3.src/lib/Driver/Driver.cpp safecode/safecode-33/tools/clang/lib/Driver/Driver.cpp
+36a37,48
+> // Include llvm/Config/config.h here as it contains the #defines
+> // normally set in clang/Config/config.h.  While we have modified
+> // the SAFECode configure script to configure clang/Config/config.h,
+> // the current configure code does not insert any definitions into 
+> // clang/Config/config.h.  While we could modify the SAFECode 
+> // configure script further to handle this, there seems to be no 
+> // point as long as we can piggy back on llvm/Config/config.h
+> //
+> //                                         JRM -- 8/26/12
+> //
+> #include "llvm/Config/config.h"
+> 
+diff --recursive cfe-3.3.src/lib/Driver/ToolChains.cpp safecode/safecode-33/tools/clang/lib/Driver/ToolChains.cpp
+32a33,45
+> //
+> // Include llvm/Config/config.h here as it contains the #defines
+> // normally set in clang/Config/config.h.  While we have modified
+> // the SAFECode configure script to configure clang/Config/config.h,
+> // the current configure code does not insert any definitions into 
+> // clang/Config/config.h.  While we could modify the SAFECode 
+> // configure script further to handle this, there seems to be no 
+> // point as long as we can piggy back on llvm/Config/config.h
+> //
+> //                                         JRM -- 8/26/12
+> //
+> #include "llvm/Config/config.h"
+> 
+diff --recursive cfe-3.3.src/lib/Driver/Tools.cpp safecode/safecode-33/tools/clang/lib/Driver/Tools.cpp
+2847a2848,2871
+> 
+>   // Handle the memory safety options
+>   
+>   if (Args.getLastArg(options::OPT_softbound)){
+>     CmdArgs.push_back("-fsoftbound");
+>   }
+> 
+>   if (Args.getLastArg(options::OPT_memsafety)) {
+>     CmdArgs.push_back("-fmemsafety");
+>   }
+> 
+>   if (Args.getLastArg(options::OPT_bbc)) {
+>     CmdArgs.push_back("-bbc");
+>   }
+> 
+>   if (Args.getLastArg(options::OPT_terminate)) {
+>     CmdArgs.push_back("-fmemsafety-terminate");
+>   }
+> 
+>   if (Arg *MemSafetyLogOpt = Args.getLastArg(options::OPT_msLogFile)) {
+>     CmdArgs.push_back("-fmemsafety-logfile");
+>     CmdArgs.push_back(MemSafetyLogOpt->getValue());
+>   }
+> 
+4751a4776,4806
+>   //
+>   // Add in any memory safety libraries.  Even if we're not compiling C++ code,
+>   // we need to link in the C++ standard libraries.
+>   //
+> 
+>   if (Args.hasArg(options::OPT_softbound)){
+>     CmdArgs.push_back("-lsoftbound_rt");
+>     //    CmdArgs.push_back("-lrt");
+>     CmdArgs.push_back("-lm");
+>     if (!Args.hasArg(options::OPT_nostdlib) &&
+>         !Args.hasArg(options::OPT_nodefaultlibs)) {
+>       getToolChain().AddCXXStdlibLibArgs(Args, CmdArgs);
+>     }
+> 
+>   }
+> 
+>   if (Args.hasArg(options::OPT_memsafety)) {
+>     if (Args.hasArg(options::OPT_bbc)) {
+>       CmdArgs.push_back("-lsc_bb_rt");
+>     } else {
+>       CmdArgs.push_back("-lsc_dbg_rt");
+>       CmdArgs.push_back("-lpoolalloc_bitmap");
+>     }
+>     CmdArgs.push_back("-lgdtoa"); 
+> 
+>     if (!Args.hasArg(options::OPT_nostdlib) &&
+>         !Args.hasArg(options::OPT_nodefaultlibs)) {
+>       getToolChain().AddCXXStdlibLibArgs(Args, CmdArgs);
+>     }
+>   }
+> 
+5039a5095,5117
+>   //
+>   // Add in any memory safety libraries.
+>   //
+>   
+>   if (Args.hasArg(options::OPT_softbound)){
+>     CmdArgs.push_back("-lsoftbound_rt");
+>     CmdArgs.push_back("-lstdc++");
+>     CmdArgs.push_back("-lrt");
+>     CmdArgs.push_back("-lm");
+>   }
+> 
+>   if (Args.hasArg(options::OPT_memsafety)) {
+>     if (Args.hasArg(options::OPT_bbc)) {
+>       CmdArgs.push_back("-lsc_bb_rt");
+>     } else {
+>       CmdArgs.push_back("-lsc_dbg_rt");
+>       CmdArgs.push_back("-lpoolalloc_bitmap");
+>     }
+>     CmdArgs.push_back("-lgdtoa"); 
+>     CmdArgs.push_back("-lstdc++");
+>   }
+> 
+> 
+5167a5246,5266
+>   //
+>   // Add in any memory safety libraries.
+>   //
+>   if (Args.hasArg(options::OPT_softbound)){
+>     CmdArgs.push_back("-lsoftbound_rt");
+>     CmdArgs.push_back("-lrt");
+>     CmdArgs.push_back("-lm");
+>     CmdArgs.push_back("-lstdc++");
+>   }
+>   
+>   if (Args.hasArg(options::OPT_memsafety)) {
+>     if (Args.hasArg(options::OPT_bbc)) {
+>       CmdArgs.push_back("-lsc_bb_rt");
+>     } else {
+>       CmdArgs.push_back("-lsc_dbg_rt");
+>       CmdArgs.push_back("-lpoolalloc_bitmap");
+>     }
+>     CmdArgs.push_back("-lgdtoa"); 
+>     CmdArgs.push_back("-lstdc++");
+>   }
+> 
+5537a5637,5657
+>  //
+>  // Add in any memory safety libraries.
+>  //
+>  if (Args.hasArg(options::OPT_softbound)){
+>     CmdArgs.push_back("-lsoftbound_rt");
+>     CmdArgs.push_back("-lstdc++");
+>     CmdArgs.push_back("-lrt");
+>     CmdArgs.push_back("-lm");
+>   }
+>   
+>   if (Args.hasArg(options::OPT_memsafety)) {
+>     if (Args.hasArg(options::OPT_bbc)) {
+>       CmdArgs.push_back("-lsc_bb_rt");
+>     } else {
+>       CmdArgs.push_back("-lsc_dbg_rt");
+>       CmdArgs.push_back("-lpoolalloc_bitmap");
+>     }    
+>     CmdArgs.push_back("-lgdtoa"); 
+>     CmdArgs.push_back("-lstdc++");
+>   }
+> 
+5707a5828,5848
+>  //
+>  // Add in any memory safety libraries.
+>  //
+>  if (Args.hasArg(options::OPT_softbound)){
+>     CmdArgs.push_back("-lsoftbound_rt");
+>     CmdArgs.push_back("-lstdc++");
+>     CmdArgs.push_back("-lrt");
+>     CmdArgs.push_back("-lm");
+>   }
+> 
+>   if (Args.hasArg(options::OPT_memsafety)) {
+>     if (Args.hasArg(options::OPT_bbc)) {
+>       CmdArgs.push_back("-lsc_bb_rt");
+>     } else {
+>       CmdArgs.push_back("-lsc_dbg_rt");
+>       CmdArgs.push_back("-lpoolalloc_bitmap");
+>     }
+>     CmdArgs.push_back("-lgdtoa");
+>     CmdArgs.push_back("-lstdc++");
+>   }
+> 
+6090a6232,6251
+>   // Add in any memory safety libraries.
+>   //
+>   if (Args.hasArg(options::OPT_softbound)){
+>     CmdArgs.push_back("-lsoftbound_rt");
+>     CmdArgs.push_back("-lrt");
+>     CmdArgs.push_back("-lm");
+>     CmdArgs.push_back("-lstdc++");
+>   }
+> 
+>   if (Args.hasArg(options::OPT_memsafety)) {
+>     if (Args.hasArg(options::OPT_bbc)) {
+>       CmdArgs.push_back("-lsc_bb_rt");
+>     } else {
+>       CmdArgs.push_back("-lsc_dbg_rt");
+>       CmdArgs.push_back("-lpoolalloc_bitmap");
+>     }
+>     CmdArgs.push_back("-lgdtoa");
+>     CmdArgs.push_back("-lstdc++");
+>   }
+> 
+6216a6378,6397
+>   //
+>   // Add in any memory safety libraries.
+>   //
+>   if (Args.hasArg(options::OPT_softbound)){
+>     CmdArgs.push_back("-lsoftbound_rt");
+>     CmdArgs.push_back("-lrt");
+>     CmdArgs.push_back("-lm");
+>     CmdArgs.push_back("-lstdc++");
+>   }
+>   if (Args.hasArg(options::OPT_memsafety)) {
+>     if (Args.hasArg(options::OPT_bbc)) {
+>       CmdArgs.push_back("-lsc_bb_rt");
+>     } else {
+>       CmdArgs.push_back("-lsc_dbg_rt");
+>       CmdArgs.push_back("-lpoolalloc_bitmap");
+>     }
+>     CmdArgs.push_back("-lgdtoa");
+>     CmdArgs.push_back("-lstdc++");
+>   }
+> 
+6348a6530,6548
+>   //
+>   // Add in any memory safety libraries.
+>   //
+>   if (Args.hasArg(options::OPT_softbound)){
+>     CmdArgs.push_back("-lsoftbound_rt");
+>     CmdArgs.push_back("-lrt");
+>     CmdArgs.push_back("-lm");
+>     CmdArgs.push_back("-lstdc++");
+>   }
+>   if (Args.hasArg(options::OPT_memsafety)) {
+>     if (Args.hasArg(options::OPT_bbc)) {
+>       CmdArgs.push_back("-lsc_bb_rt");
+>     } else {
+>       CmdArgs.push_back("-lsc_dbg_rt");
+>       CmdArgs.push_back("-lpoolalloc_bitmap");
+>     }
+>     CmdArgs.push_back("-lgdtoa");
+>     CmdArgs.push_back("-lstdc++");
+>   }
+diff --recursive cfe-3.3.src/lib/Frontend/CompilerInvocation.cpp safecode/safecode-33/tools/clang/lib/Frontend/CompilerInvocation.cpp
+377a378,386
+>   Opts.MemSafety = Args.hasArg(OPT_memsafety);
+>   Opts.BaggyBounds = Args.hasArg(OPT_bbc);
+>   Opts.SoftBound = Args.hasArg(OPT_softbound);
+>   Opts.MemSafeTerminate = Args.hasArg(OPT_terminate);
+>   if (Arg *A = Args.getLastArg(OPT_msLogFile)) {
+>     Opts.MemSafetyLogFile = A->getValue();
+>   } else {
+>     Opts.MemSafetyLogFile = "";
+>   }
+diff --recursive cfe-3.3.src/lib/Frontend/InitHeaderSearch.cpp safecode/safecode-33/tools/clang/lib/Frontend/InitHeaderSearch.cpp
+17d16
+< #include "clang/Config/config.h" // C_INCLUDE_DIRS
+29a29,42
+> 
+> //
+> // Include llvm/Config/config.h here as it contains the #defines
+> // normally set in clang/Config/config.h.  While we have modified
+> // the SAFECode configure script to configure clang/Config/config.h,
+> // the current configure code does not insert any definitions into 
+> // clang/Config/config.h.  While we could modify the SAFECode 
+> // configure script further to handle this, there seems to be no 
+> // point as long as we can piggy back on llvm/Config/config.h
+> // 
+> // JRM -- 8/26/12
+> // 
+> #include "llvm/Config/config.h"
+> #include "clang/Config/config.h" // C_INCLUDE_DIRS
+diff --recursive cfe-3.3.src/lib/FrontendTool/Makefile safecode/safecode-33/tools/clang/lib/FrontendTool/Makefile
+14c14
+< include $(CLANG_LEVEL)/../../Makefile.config
+---
+> include $(CLANG_LEVEL)/../../../../Makefile.config
+diff --recursive cfe-3.3.src/lib/Lex/Makefile safecode/safecode-33/tools/clang/lib/Lex/Makefile
+15c15
+< include $(CLANG_LEVEL)/../../Makefile.config
+---
+> include $(CLANG_LEVEL)/../../../../Makefile.config
+diff --recursive cfe-3.3.src/lib/Lex/PPDirectives.cpp safecode/safecode-33/tools/clang/lib/Lex/PPDirectives.cpp
+1898a1899,1900
+>           MI->AddTokenToBody(LastTok);
+>           continue;
+diff --recursive cfe-3.3.src/lib/Makefile safecode/safecode-33/tools/clang/lib/Makefile
+16c16
+< include $(CLANG_LEVEL)/../../Makefile.config
+---
+> include $(CLANG_LEVEL)/../../../../Makefile.config
+diff --recursive cfe-3.3.src/runtime/Makefile safecode/safecode-33/tools/clang/runtime/Makefile
+11c11
+< include $(CLANG_LEVEL)/../../Makefile.config
+---
+> include $(CLANG_LEVEL)/../../../../Makefile.config
+diff --recursive cfe-3.3.src/test/Preprocessor/assembler-with-cpp.c safecode/safecode-33/tools/clang/test/Preprocessor/assembler-with-cpp.c
+79a80,83
+> 
+> #define X(a) # # # 1
+> X(1)
+> // CHECK-Identifiers-False: # # # 1
+diff --recursive cfe-3.3.src/tools/arcmt-test/Makefile safecode/safecode-33/tools/clang/tools/arcmt-test/Makefile
+19c19
+< include $(CLANG_LEVEL)/../../Makefile.config
+---
+> include $(CLANG_LEVEL)/../../../../Makefile.config
+diff --recursive cfe-3.3.src/tools/c-arcmt-test/Makefile safecode/safecode-33/tools/clang/tools/c-arcmt-test/Makefile
+22c22
+< include $(CLANG_LEVEL)/../../Makefile.config
+---
+> include $(CLANG_LEVEL)/../../../../Makefile.config
+diff --recursive cfe-3.3.src/tools/c-index-test/Makefile safecode/safecode-33/tools/clang/tools/c-index-test/Makefile
+23c23
+< include $(CLANG_LEVEL)/../../Makefile.config
+---
+> include $(CLANG_LEVEL)/../../../../Makefile.config
+diff --recursive cfe-3.3.src/tools/clang-check/Makefile safecode/safecode-33/tools/clang/tools/clang-check/Makefile
+17c17
+< include $(CLANG_LEVEL)/../../Makefile.config
+---
+> include $(CLANG_LEVEL)/../../../../Makefile.config
+diff --recursive cfe-3.3.src/tools/clang-format/Makefile safecode/safecode-33/tools/clang/tools/clang-format/Makefile
+17c17
+< include $(CLANG_LEVEL)/../../Makefile.config
+---
+> include $(CLANG_LEVEL)/../../../../Makefile.config
+diff --recursive cfe-3.3.src/tools/diagtool/Makefile safecode/safecode-33/tools/clang/tools/diagtool/Makefile
+19c19
+< include $(CLANG_LEVEL)/../../Makefile.config
+---
+> include $(CLANG_LEVEL)/../../../../Makefile.config
+diff --recursive cfe-3.3.src/tools/driver/Makefile safecode/safecode-33/tools/clang/tools/driver/Makefile
+30c30
+< include $(CLANG_LEVEL)/../../Makefile.config
+---
+> include $(CLANG_LEVEL)/../../../../Makefile.config
+50a51,57
+> 
+> #
+> # Link in the SAFECode passes
+> #
+> USEDLIBS += abc.a addchecks.a sc-support.a baggyboundscheck.a debuginstr.a \
+>             softbound.a formatstrings.a convert.a cstdlib.a optchecks.a oob.a \
+>             cmspasses.a
+diff --recursive cfe-3.3.src/tools/libclang/Makefile safecode/safecode-33/tools/clang/tools/libclang/Makefile
+18c18
+< include $(CLANG_LEVEL)/../../Makefile.config
+---
+> include $(CLANG_LEVEL)/../../../../Makefile.config
+diff --recursive cfe-3.3.src/tools/Makefile safecode/safecode-33/tools/clang/tools/Makefile
+12c12
+< include $(CLANG_LEVEL)/../../Makefile.config
+---
+> include $(CLANG_LEVEL)/../../../../Makefile.config
+diff --recursive cfe-3.3.src/unittests/AST/Makefile safecode/safecode-33/tools/clang/unittests/AST/Makefile
+12c12
+< include $(CLANG_LEVEL)/../../Makefile.config
+---
+> include $(CLANG_LEVEL)/../../../../Makefile.config
+diff --recursive cfe-3.3.src/unittests/ASTMatchers/Makefile safecode/safecode-33/tools/clang/unittests/ASTMatchers/Makefile
+13c13
+< include $(CLANG_LEVEL)/../../Makefile.config
+---
+> include $(CLANG_LEVEL)/../../../../Makefile.config
+diff --recursive cfe-3.3.src/unittests/Format/Makefile safecode/safecode-33/tools/clang/unittests/Format/Makefile
+12c12
+< include $(CLANG_LEVEL)/../../Makefile.config
+---
+> include $(CLANG_LEVEL)/../../../../Makefile.config
+diff --recursive cfe-3.3.src/unittests/Frontend/Makefile safecode/safecode-33/tools/clang/unittests/Frontend/Makefile
+12c12
+< include $(CLANG_LEVEL)/../../Makefile.config
+---
+> include $(CLANG_LEVEL)/../../../../Makefile.config
+diff --recursive cfe-3.3.src/unittests/Makefile safecode/safecode-33/tools/clang/unittests/Makefile
+19c19
+< include $(CLANG_LEVEL)/../..//Makefile.config
+---
+> include $(CLANG_LEVEL)/../..//../../Makefile.config
+diff --recursive cfe-3.3.src/unittests/Tooling/Makefile safecode/safecode-33/tools/clang/unittests/Tooling/Makefile
+12c12
+< include $(CLANG_LEVEL)/../../Makefile.config
+---
+> include $(CLANG_LEVEL)/../../../../Makefile.config
+diff --recursive cfe-3.3.src/utils/TableGen/Makefile safecode/safecode-33/tools/clang/utils/TableGen/Makefile
+12c12
+< USEDLIBS = LLVMTableGen.a LLVMSupport.a
+---
+> LLVMLIBS = LLVMTableGen.a LLVMSupport.a
+diff --recursive cfe-3.3.src/www/cxx_status.html safecode/safecode-33/tools/clang/www/cxx_status.html
+28c28
+< <p>Last updated: $Date: 2013-05-20 17:28:07 -0700 (Mon, 20 May 2013) $</p>
+---
+> <p>Last updated: $Date: 2013-05-20 20:28:07 -0400 (Mon, 20 May 2013) $</p>
