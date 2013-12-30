@@ -216,7 +216,20 @@ void InitializeSoftBoundCETS:: constructMetadataHandlers(Module & module){
   module.getOrInsertFunction("__softboundcets_spatial_call_dereference_check",
                              VoidTy, VoidPtrTy, VoidPtrTy, VoidPtrTy, NULL);
 
+
+  Type* size_ty = Type::getInt64Ty(module.getContext());
+
+  PointerType* sizet_ptr_ty = PointerType::getUnqual(Type::getInt64Ty(module.getContext()));
+
+  module.getOrInsertFunction("__softboundcets_print_metadata", VoidTy, VoidPtrTy, VoidPtrTy, VoidPtrTy, size_ty, sizet_ptr_ty, NULL);
+
   
+  module.getOrInsertFunction("__softboundcets_dummy", VoidTy, NULL);
+
+  Type* bool_ty = Type::getInt1Ty(module.getContext());
+
+  module.getOrInsertFunction("__softboundcets_intermediate", VoidTy, bool_ty, bool_ty, bool_ty, size_ty, NULL);
+
 }
 
 void InitializeSoftBoundCETS:: constructCheckHandlers(Module & module){

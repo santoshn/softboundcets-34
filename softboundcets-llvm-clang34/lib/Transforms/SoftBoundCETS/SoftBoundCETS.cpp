@@ -879,6 +879,9 @@ bool SoftBoundCETSPass::isFuncDefSoftBound(const std::string &str) {
     m_func_wrappers_available["__ctype_tolower_loc"] = true;
     m_func_wrappers_available["qsort"] = true;
     
+    m_func_def_softbound["__softboundcets_intermediate"]= true;
+    m_func_def_softbound["__softboundcets_dummy"] = true;
+    m_func_def_softbound["__softboundcets_print_metadata"] = true;
     m_func_def_softbound["__softboundcets_introspect_metadata"] = true;
     m_func_def_softbound["__softboundcets_copy_metadata"] = true;
     m_func_def_softbound["__softboundcets_allocate_shadow_stack_space"] = true;
@@ -2730,8 +2733,12 @@ createFaultBlock (Function * F) {
   //
   LLVMContext & Context = F->getContext();
   Module * M = F->getParent();
-  M->getOrInsertFunction ("abort", Type::getVoidTy (Context), NULL);
-  CallInst::Create (M->getFunction ("abort"), "", UI);
+
+  M->getOrInsertFunction("__softboundcets_dummy", Type::getVoidTy(Context), NULL);
+  CallInst::Create(M->getFunction("__softboundcets_dummy"), "", UI);
+  
+  M->getOrInsertFunction ("__softboundcets_abort", Type::getVoidTy (Context), NULL);
+  CallInst::Create (M->getFunction ("__softboundcets_abort"), "", UI);
 
   return faultBB;
 }
@@ -2873,34 +2880,6 @@ SoftBoundCETSPass::addLoadStoreChecks(Instruction* load_store,
   Value* size_of_type = getSizeOfType(pointer_operand_type);
   args.push_back(size_of_type);
 
-  
-  Instruction* split_inst = load_store;
-  BasicBlock* old_bb = split_inst->getParent();
-  BasicBlock* cont = old_bb->splitBasicBlock(split_inst);
-  
-
-  // This the code to inline the checks
-  ICmpInst* Compare1 = new ICmpInst (load_store, CmpInst::ICMP_ULE, 
-				     cast_pointer_operand_value, 
-				     bitcast_base,"cmp1");
-  
-  ICmpInst* Compare2 = new ICmpInst(load_store, CmpInst::ICMP_ULT, 
-				    cast_pointer_operand_value, 
-				    bitcast_bound, "cmp2");
-  
-  Value* Result = BinaryOperator:: Create(Instruction::And, Compare1, Compare2, 
-					  "and", load_store);
-  
-  Function* curr_func = load_store->getParent()->getParent();
-  BasicBlock* fault_bb  = m_faulting_block[curr_func];
-  old_bb->getTerminator()->eraseFromParent();
-  BranchInst::Create(fault_bb, cont, Result, old_bb);
-  
-
-
-
-#if 0
-
   if(isa<LoadInst>(load_store)){
             
     CallInst::Create(m_spatial_load_dereference_check, args, "", load_store);
@@ -2908,7 +2887,7 @@ SoftBoundCETSPass::addLoadStoreChecks(Instruction* load_store,
   else{    
     CallInst::Create(m_spatial_store_dereference_check, args, "", load_store);
   }
-#endif
+
   return;
 }
 
@@ -3373,7 +3352,10 @@ void SoftBoundCETSPass::addDereferenceChecks(Function* func) {
   if(metadata_prop_only)
     return;
 
-  std::vector<Instruction*> SpatialCheckWorkList;
+  std::vector<Instruction*> CheckWorkList;
+  std::map<Value*, bool> ElideSpatialCheck;
+  std::map<Value*, bool> ElideTemporalCheck;
+  
 
   // identify all the instructions where we need to insert the spatial checks
   for(inst_iterator i = inst_begin(F), e = inst_end(F); i != e; ++i){
@@ -3386,15 +3368,61 @@ void SoftBoundCETSPass::addDereferenceChecks(Function* func) {
     // add check optimizations here
     // add checks for memory fences and atomic exchanges
     if(isa<LoadInst>(I) || isa<StoreInst>(I)){
-      SpatialCheckWorkList.push_back(I);
+      CheckWorkList.push_back(I);
     }     
     if(isa<AtomicCmpXchgInst>(I) || isa<AtomicRMWInst>(I)){
       assert(0 && "Atomic Instructions not handled");
     }    
   }
 
-  for(std::vector<Instruction*>::iterator i = SpatialCheckWorkList.begin(), 
-	e = SpatialCheckWorkList.end(); i != e ; ++i){
+
+  // spatial check optimizations here 
+
+  for(std::vector<Instruction*>::iterator i = CheckWorkList.begin(), 
+	e = CheckWorkList.end(); i!= e; ++i){
+
+    Instruction* inst = *i;
+    Value* pointer_operand = NULL;
+    
+    if(ElideSpatialCheck.count(inst))
+      continue;
+    
+    if(isa<LoadInst>(inst)){
+      LoadInst* ldi = dyn_cast<LoadInst>(inst);
+      pointer_operand = ldi->getPointerOperand();
+    }
+    if(isa<StoreInst>(inst)){
+      StoreInst* st = dyn_cast<StoreInst>(inst);
+      pointer_operand = st->getOperand(1);      
+    }
+
+    for(Value::use_iterator ui = pointer_operand->use_begin(),  
+	  ue = pointer_operand->use_end();
+	ui != ue; ++ui){
+
+      Instruction* use_inst = dyn_cast<Instruction>(*ui);
+      if(!use_inst || (use_inst == inst))
+	continue;
+
+      if(!isa<LoadInst>(use_inst)  && !isa<StoreInst>(use_inst))
+	continue;
+
+      if(isa<StoreInst>(use_inst)){
+	if(use_inst->getOperand(1) != pointer_operand)
+	  continue;
+      }
+
+      if(m_dominator_tree->dominates(inst, use_inst)){
+	if(!ElideSpatialCheck.count(use_inst))
+	  ElideSpatialCheck[use_inst] = true;		
+      }
+    }  
+  }
+
+  //Temporal Check Optimizations
+
+  for(std::vector<Instruction*>::iterator i = CheckWorkList.begin(), 
+	e = CheckWorkList.end(); i != e ; ++i){
 
     Instruction* Inst = *i;
     
@@ -3424,92 +3452,46 @@ void SoftBoundCETSPass::addDereferenceChecks(Function* func) {
 
     Value* cast_pointer_lock = Builder->CreateBitCast(pointer_lock, m_sizet_ptr_type);
     Value* lock_load = Builder->CreateLoad(cast_pointer_lock, "");
-    Value* cmp_eq = Builder->CreateICmpEQ(pointer_key, lock_load);
+    Value* cmp_eq = Builder->CreateICmpNE(pointer_key, lock_load);
 
 
     Value* cast_pointer = Builder->CreateBitCast(pointer_operand, m_void_ptr_type);
+
+    Value* sizeofType = getSizeOfType(pointer_operand->getType());
+    
     Value* Cmp1 = Builder->CreateICmpULT(cast_pointer, pointer_base);
-    Value* Cmp2 = Builder->CreateICmpUGT(cast_pointer, pointer_bound);
+    Value* sub = Builder->CreatePtrDiff(pointer_bound, cast_pointer);
+    
+    Value* Cmp2 = Builder->CreateICmpUGT(sizeofType, sub);
     
     Value* Or = Builder->CreateOr(Cmp1, Cmp2);
 
-    //   Value* Or2 = Builder->CreateOr(Or, cmp_eq);
-
-    BasicBlock *OldBB = Inst->getParent();
-    BasicBlock *Cont = OldBB->splitBasicBlock(Inst);
-    OldBB->getTerminator()->eraseFromParent();
-
-    BasicBlock* faultBB = m_faulting_block[Inst->getParent()->getParent()];
-    
-    BranchInst::Create(faultBB, Cont, Or, OldBB);
-    
-    continue;
-  }
+    Value* Or2 = Builder->CreateOr(Or, cmp_eq);
 
 #if 0
-  std::vector<Instruction*> TemporalCheckWorkList;
+    Function* call_print_metadata = Inst->getParent()->getParent()->getParent()->getFunction("__softboundcets_print_metadata");
 
-  // identify all the instructions where we need to insert the temporal checks
-  for(inst_iterator i = inst_begin(F), e = inst_end(F); i != e; ++i){
+    assert(call_print_metadata && "__softboundcets_print_metadata null?");
+    Builder->CreateCall5(call_print_metadata, pointer_base, pointer_bound, cast_pointer, pointer_key, cast_pointer_lock);
 
-    Instruction* I = &*i;
+    Function* intermediate = Inst->getParent()->getParent()->getParent()->getFunction("__softboundcets_intermediate");
 
-    if(!m_present_in_original.count(I)){
-      continue;
-    }
-    // add check optimizations here
-    // add checks for memory fences and atomic exchanges
-    if(isa<LoadInst>(I) || isa<StoreInst>(I)){
-      TemporalCheckWorkList.push_back(I);
-    }     
-    if(isa<AtomicCmpXchgInst>(I) || isa<AtomicRMWInst>(I)){
-      assert(0 && "Atomic Instructions not handled");
-    }    
-  }
+    Builder->CreateCall4(intermediate, Cmp1, Cmp2, cmp_eq, lock_load);
+#endif
 
-  for(std::vector<Instruction*>::iterator i = TemporalCheckWorkList.begin(), 
-	e = TemporalCheckWorkList.end(); i != e ; ++i){
-
-    Instruction* Inst = *i;
-    
-    Value* pointer_operand  = NULL;
-
-    if(isa<LoadInst>(Inst)){
-      LoadInst* ldi = dyn_cast<LoadInst>(Inst);
-      pointer_operand = ldi->getPointerOperand();
-    }
-    
-    if(isa<StoreInst>(Inst)){
-      StoreInst* st = dyn_cast<StoreInst>(Inst);
-      pointer_operand = st->getOperand(1);
-    }
-
-    if(isa<ConstantExpr>(pointer_operand))
-     continue;
-    
-    Value* pointer_key = getAssociatedKey(pointer_operand);
-    Value* func_temp_lock = getAssociatedFuncLock(Inst);
-    Value* pointer_lock = getAssociatedLock(pointer_operand, func_temp_lock);
-    
-    Builder->SetInsertPoint(Inst);
-
-    Value* cast_pointer_lock = Builder->CreateBitCast(pointer_lock, m_sizet_ptr_type);
-    Value* lock_load = Builder->CreateLoad(cast_pointer_lock, "");
-    Value* cmp_eq = Builder->CreateICmpEQ(pointer_key, lock_load);
-    
-   
     BasicBlock *OldBB = Inst->getParent();
     BasicBlock *Cont = OldBB->splitBasicBlock(Inst);
     OldBB->getTerminator()->eraseFromParent();
 
+    assert(m_faulting_block.count(Inst->getParent()->getParent()));
     BasicBlock* faultBB = m_faulting_block[Inst->getParent()->getParent()];
-    
-    BranchInst::Create(faultBB, Cont, cmp_eq, OldBB);
+
+    BranchInst::Create(faultBB, Cont, Or2, OldBB);
     
     continue;
   }
 
-#endif
+
   
   return;
   m_dominator_tree = &getAnalysis<DominatorTree>(*func);
