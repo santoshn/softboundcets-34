@@ -3357,6 +3357,7 @@ void SoftBoundCETSPass::addDereferenceChecks(Function* func) {
   std::map<Value*, bool> ElideTemporalCheck;
   
 
+
   // identify all the instructions where we need to insert the spatial checks
   for(inst_iterator i = inst_begin(F), e = inst_end(F); i != e; ++i){
 
@@ -3375,7 +3376,7 @@ void SoftBoundCETSPass::addDereferenceChecks(Function* func) {
     }    
   }
 
-
+#if 0
   // spatial check optimizations here 
 
   for(std::vector<Instruction*>::iterator i = CheckWorkList.begin(), 
@@ -3418,6 +3419,8 @@ void SoftBoundCETSPass::addDereferenceChecks(Function* func) {
       }
     }  
   }
+
+#endif
 
   //Temporal Check Optimizations
 

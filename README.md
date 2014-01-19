@@ -1,11 +1,11 @@
 This is a README FILE for SoftBoundCETS pointer-based checking. For
-more details on the techniques and tools, visit SoftBoundCETS website
-at http://www.cs.rutgers.edu/~santosh.nagarakatte/softbound/
+more technical details and algorithms, visit SoftBoundCETS website at
+http://www.cs.rutgers.edu/~santosh.nagarakatte/softbound/
 
 
 
 Instructions for using the integrated version of SoftBoundCETS with
-LLVM+CLANG-3.4
+LLVM+CLANG-3.4 on a x86-64 machine with Linux OS
 ===================================================================
 
 
@@ -43,7 +43,7 @@ softboundcets-lib directory
     (b) Goto to tests directory with the following command
 
         cd tests
-	clang -fsoftboundcets test.c -o test.out -L/<git_repo>/softboundcets-lib/
+	clang -fsoftboundcets test.c -o test.out -L/<git_repo>/softboundcets-lib/ -lm
 
 	
     (c) Run the test program
