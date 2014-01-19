@@ -4,9 +4,8 @@ http://www.cs.rutgers.edu/~santosh.nagarakatte/softbound/
 
 
 
-Instructions for using the integrated version of SoftBoundCETS with
-LLVM+CLANG-3.4 on a x86-64 machine with Linux OS
-===================================================================
+Using SoftBoundCETS with LLVM+CLANG-3.4 on a x86-64 machine with Linux OS
+=========================================================================
 
 
 (1) Download the github repository from http://www.github.com/santoshn/softboundcets-34
