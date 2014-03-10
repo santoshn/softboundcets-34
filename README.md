@@ -8,57 +8,63 @@ Using SoftBoundCETS with LLVM+CLANG-3.4 on a x86-64 machine with Linux OS
 =========================================================================
 
 
-(1) Download the github repository from http://www.github.com/santoshn/softboundcets-34
+1. Download the github repository from http://www.github.com/santoshn/softboundcets-34
 
-(2) Goto directory softboundcets-lib
+2. Build SoftBoundCETS for LLVM+3.4
 
-(3) Build the softboundcets instrumenter library by typing "make" in
-softboundcets-lib directory
+   1. Goto to directory softboundcets-llvm-clang34 by executing the following command
 
-(4) Build SoftBoundCETS for LLVM+3.4 
+            cd softboundcets-llvm-clang34
 
-   (a) Goto to directory softboundcets-llvm-clang34 by executing the following command
+   2. Configure LLVM, clang and softboundcets with the following command
 
-      cd softboundcets-llvm-clang34
+            ./configure --enable-assertions --disable-optimized
 
-   (b) Configure the llvm, clang and softboundcets with the following command
+      If you prefer a faster compiler and do not need to debug SoftBoundCETS,
+      use `--enable-optimized`.
 
-     ./configure --enable-assertions --disable-optimized
+      If you want to use SoftBoundCETS with LTO, follow the instructions at
+      http://llvm.org/docs/GoldPlugin.html and add the
+      `--with-binutils-include=/usr/include` parameter. Replace `/usr/include` by
+      the folder that contains the `plugin-api.h` file.
 
-   (c) Build softboundcets, llvm, clang with the following command
-     
-      make -j8
+   3. Build softboundcets, LLVM, clang with the following command
 
-(5) Running a program with softboundcets
- 
-    (a) Set PATH environment variable to point to binary directory
+            make -j8
 
-     	For example in bash, it would be
+3. Set up your environment to use SoftBoundCETS
 
-	export PATH=<git_repo>/softboundcets-llvm-clang34/Debug+Asserts/bin:$PATH
-	export LD_LIBRARY_PATH=<git_repo>/softboundcets-lib/
+   For example in bash, it would be
 
+         export PATH=<git_repo>/softboundcets-llvm-clang34/Debug+Asserts/bin:$PATH
 
-    (b) Goto to tests directory with the following command
+   If you compiled an optimized build, the path is `Release+Asserts` instead of
+   `Debug+Asserts`.
 
-        cd tests
-	clang -fsoftboundcets test.c -o test.out -L/<git_repo>/softboundcets-lib/ -lm
+4. Compile the SoftBoundCETS runtime library
 
-	
-    (c) Run the test program
+         cd <git_repo>
+         cd softboundcets-lib
+         make
 
-        ./test.out
+   If you compiled the LLVM gold plugin, add the line below before calling
+   make, in order to also build the SoftBoundCETS runtime library with LTO
+   support.
 
-	enter 10
+         export LLVM_GOLD=<git_repo>/softboundcets-llvm-clang34/Debug+Asserts/lib/LLVMgold.so
 
-	Program executes successfully
+5. Test whether it all worked
 
-	enter 105
-	
-	Memory safety violation is triggered.
-	
-	
-    
-	
-	
-     
+   1. Compile
+
+            cd tests
+            clang -fsoftboundcets test.c -o test -L<git_repo>/softboundcets-lib -lm
+            clang -fsoftboundcets -flto test.c -o test-lto -L<git_repo>/softboundcets-lib/lto -lm
+
+   2. Run the test program
+
+            ./test
+
+      Enter 10; the program executes successfully.
+
+      Enter 105; a memory safety violation is triggered.
