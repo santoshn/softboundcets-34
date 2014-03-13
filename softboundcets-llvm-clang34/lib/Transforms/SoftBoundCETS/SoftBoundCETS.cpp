@@ -3424,6 +3424,10 @@ void SoftBoundCETSPass::addDereferenceChecks(Function* func) {
 
   //Temporal Check Optimizations
 
+#ifdef INSERT_CHECKS_DIRECTLY
+  // the following code adds checks directly into the program. It bypasses the
+  // *_check functions in the runtime library. This can be helpful if LTO does
+  // not work properly
   for(std::vector<Instruction*>::iterator i = CheckWorkList.begin(), 
 	e = CheckWorkList.end(); i != e ; ++i){
 
@@ -3494,9 +3498,10 @@ void SoftBoundCETSPass::addDereferenceChecks(Function* func) {
     continue;
   }
 
-
-  
   return;
+#endif
+  
+  
   m_dominator_tree = &getAnalysis<DominatorTree>(*func);
 
   /* intra-procedural load dererference check elimination map */
@@ -3549,7 +3554,6 @@ void SoftBoundCETSPass::addDereferenceChecks(Function* func) {
     /* structure check optimization */
     std::map<Value*, int> bb_struct_check_opt;
 
-#if 0
     for(BasicBlock::iterator i = bb->begin(), ie = bb->end(); i != ie; ++i){
       Value* v1 = dyn_cast<Value>(i);
       Instruction* new_inst = dyn_cast<Instruction>(i);
@@ -3563,7 +3567,7 @@ void SoftBoundCETSPass::addDereferenceChecks(Function* func) {
         if(store_only)
           continue;
 
-        change = addLoadStoreChecks(new_inst, func_deref_check_elim_map);
+        addLoadStoreChecks(new_inst, func_deref_check_elim_map);
         addTemporalChecks(new_inst, bb_temporal_check_elim_map, func_temporal_check_elim_map);
         continue;
       }
@@ -3624,7 +3628,6 @@ void SoftBoundCETSPass::addDereferenceChecks(Function* func) {
         continue;
       } /* Call check ends */
     }
-#endif
   }  
 }
 
