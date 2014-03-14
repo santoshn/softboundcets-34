@@ -740,10 +740,10 @@ __softboundcets_memcopy_check(void* dest, void* src, size_t size,
   if(size >= LONG_MAX)
     __softboundcets_abort();
   
-  if(dest < dest_base || dest + size > dest_bound)
+  if(dest < dest_base || dest > ((char*) dest_bound - size) || (size > (size_t) dest_bound))
     __softboundcets_abort();
 
-  if(src < src_base || src + size > src_bound)
+  if(src < src_base || src > ((char*) src_bound - size) || (size > (size_t) dest_bound))
     __softboundcets_abort();
 
 }
@@ -792,10 +792,10 @@ __softboundcets_memcopy_check(void* dest, void* src, size_t size,
     __softboundcets_abort();
 
 
-  if(dest < dest_base || (char*) dest + size > (char*) dest_bound)
+  if(dest < dest_base || (char*) dest > ((char*) dest_bound - size) || (size > (size_t) dest_bound))
     __softboundcets_abort();
 
-  if(src < src_base || (char*) src + size > (char*) src_bound)
+  if(src < src_base || (char*) src > ((char*) src_bound - size) || (size > (size_t) dest_bound))
     __softboundcets_abort();
 
   if(dest_key != *((size_t*)(dest_lock))){
@@ -841,7 +841,7 @@ __softboundcets_memset_check(void* dest, size_t size,
   if(size >= LONG_MAX)
     __softboundcets_abort();
   
-  if(dest < dest_base || dest + size > dest_bound)
+  if(dest < dest_base || (char*) dest > ((char*)dest_bound - size) || (size > (size_t)dest_bound))
     __softboundcets_abort();
 
 }
@@ -886,7 +886,7 @@ __softboundcets_memset_check(void* dest, size_t size,
   if(size >= LONG_MAX)
     __softboundcets_abort();
 
-  if(dest < dest_base || (char*) dest + size > (char*) dest_bound)
+  if(dest < dest_base || (char*) dest > ((char*) dest_bound - size) || (size > (size_t) dest_bound))
     __softboundcets_abort();
 
   if(dest_key != *((size_t*)(dest_lock))){
