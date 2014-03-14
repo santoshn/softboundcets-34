@@ -1353,11 +1353,11 @@ __WEAK_INLINE char* softboundcets_strcpy(char* dest, char* src){
      overflow?
   */
   size_t size = strlen(src);
-  if(dest < dest_base || dest + size + 1 > dest_bound){
+  if(dest < dest_base || (dest > dest_bound - size -1) || (size > (size_t) dest_bound)){
     printf("[strcpy] overflow in strcpy with dest\n");
     __softboundcets_abort();
   }  
-  if(src < src_base || src + size + 1 > src_bound){
+  if(src < src_base || (src > src_bound -size -1) || (size > (size_t) src_bound)){
     printf("[strcpy] overflow in strcpy with src\n");
     __softboundcets_abort();
   }
@@ -1377,11 +1377,11 @@ __WEAK_INLINE char* softboundcets_strcpy(char* dest, char* src){
   */
 #ifndef __NOSIM_CHECKS
   size_t size = strlen(src);
-  if(dest < dest_base || dest + size + 1 > dest_bound){
+  if(dest < dest_base || (dest > dest_bound - size -1) || (size > (size_t) dest_bound)){
     printf("[strcpy] overflow in strcpy with dest\n");
     __softboundcets_abort();
   }  
-  if(src < src_base || src + size + 1 > src_bound){
+  if(src < src_base || (src > src_bound -size -1 ) || (size > (size_t) src_bound)){
     printf("[strcpy] overflow in strcpy with src\n");
     __softboundcets_abort();
   }
@@ -1510,11 +1510,11 @@ softboundcets_strncpy(char* dest, char* src, size_t n){
   char* src_bound = __softboundcets_load_bound_shadow_stack(2);
 
   /* Can either (dest + n) or (src + n) overflow? */
-  if(dest < dest_base || dest + n> dest_bound){
+  if(dest < dest_base || (dest > dest_bound - n) || (n > (size_t) dest_bound)){
     printf("[strncpy] overflow in strncpy with dest\n");
     __softboundcets_abort();
   }  
-  if(src < src_base || src + n > src_bound){
+  if(src < src_base || (src > src_bound -n) || (n > (size_t) src_bound)){
     __softboundcets_abort();
   }
 #endif

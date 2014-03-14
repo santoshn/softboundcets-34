@@ -654,17 +654,6 @@ __softboundcets_spatial_load_dereference_check(void *base, void *bound,
                                                void *ptr, size_t size_of_type)
 {
 
-
-#ifdef __SBCETS_ASM_MODE_SCHK
-  __asm__("icschk %0, %1\n\t"
-          :
-          : "r"(base), "r"(bound), "a"(ptr)
-          );
-
-  return;
-  
-#endif
-
 #ifdef __SBCETS_STATS_MODE
   __sbcets_stats_spatial_load_dereference_checks++;
 #endif
@@ -690,18 +679,6 @@ __softboundcets_spatial_store_dereference_check(void *base,
                                                 void *ptr, 
                                                 size_t size_of_type)
 {
-
-
-#ifdef __SBCETS_ASM_MODE_SCHK
-  __asm__("icschk %0, %1\n\t"
-          :
-          : "r"(base), "r"(bound), "a"(ptr)
-          );
-
-  return;
-  
-#endif
-
 
 #ifdef __SBCETS_STATS_MODE
   __sbcets_stats_spatial_store_dereference_checks++;
@@ -953,38 +930,6 @@ __METADATA_INLINE void __softboundcets_metadata_store(void* addr_of_ptr,
   __sbcets_stats_metadata_stores++;
 #endif
 
-
-#ifdef __SBCETS_ASM_MODE_META
-  __asm__("icmdstb %0, %1\n\t"
-          :
-          : "r"(addr_of_ptr), "r"(base)
-          : "memory"
-          );
-
-  __asm__("icmdstbd %0, %1\n\t"
-          :
-          : "r"(addr_of_ptr), "r"(bound)
-          : "memory"
-          );
-
-  __asm__("icmdstk %0, %1\n\t"
-          :
-          : "r"(addr_of_ptr), "r"(key)
-          : "memory"
-          );
-
-  __asm__("icmdstl %0, %1\n\t"
-          :
-          : "r"(addr_of_ptr), "r"(lock)
-          : "memory"
-          );
-
-  return;
-  
-#endif
-
-
-   
   size_t ptr = (size_t) addr_of_ptr;
   size_t primary_index;
   __softboundcets_trie_entry_t* trie_secondary_table;
@@ -1049,11 +994,6 @@ __METADATA_INLINE void __softboundcets_metadata_store(void* addr_of_ptr,
  __WEAK_INLINE void* __softboundcets_metadata_map(void* addr_of_ptr){
 
 
-#ifdef __SBCETS_ASM_MODE_META
-   return addr_of_ptr;
-#endif   
-
-
     size_t ptr = (size_t) addr_of_ptr;
     __softboundcets_trie_entry_t* trie_secondary_table;
     size_t primary_index = ( ptr >> 25);
@@ -1077,42 +1017,13 @@ __METADATA_INLINE void __softboundcets_metadata_store(void* addr_of_ptr,
  }
 
  __WEAK_INLINE void* __softboundcets_metadata_load_base(void* address){
-   
-#ifdef __SBCETS_ASM_MODE_META
-
-   void* load_base;
-
-   __asm__("icmdldb %1, %0\n\t"
-           : "=r"(load_base)
-           : "r"(address)
-           : "memory"
-           );
-
-   return load_base;
-
-#endif
-   
+      
    __softboundcets_trie_entry_t* entry_ptr = (__softboundcets_trie_entry_t*)address;
    return entry_ptr->base;
    
  }
 
  __WEAK_INLINE void* __softboundcets_metadata_load_bound(void* address){
-
-#ifdef __SBCETS_ASM_MODE_META
-
-   void* load_bound;
-
-   __asm__("icmdldbd %1, %0\n\t"
-           : "=r"(load_bound)
-           : "r"(address)
-           : "memory"
-           );
-
-   return load_bound;
-
-#endif
-
 
    __softboundcets_trie_entry_t* entry_ptr = (__softboundcets_trie_entry_t*)address;
    return entry_ptr->bound;
@@ -1122,40 +1033,12 @@ __METADATA_INLINE void __softboundcets_metadata_store(void* addr_of_ptr,
 
  __WEAK_INLINE size_t __softboundcets_metadata_load_key(void* address){
 
-#ifdef __SBCETS_ASM_MODE_META
-
-   size_t load_key;
-
-   __asm__("icmdldk %1, %0\n\t"
-           : "=r"(load_key)
-           : "r"(address)
-           : "memory"
-           );
-   return load_key;
-
-#endif
-
-
    __softboundcets_trie_entry_t* entry_ptr = (__softboundcets_trie_entry_t*)address;
    return entry_ptr->key;
 
  }
 
  __WEAK_INLINE void* __softboundcets_metadata_load_lock(void* address){
-
-#ifdef __SBCETS_ASM_MODE_META
-
-   void* load_lock;
-
-   __asm__("icmdldl %1, %0\n\t"
-           : "=r"(load_lock)
-           : "r"(address)
-           : "memory"
-           );
-   return load_lock;
-
-#endif
-
 
    __softboundcets_trie_entry_t* entry_ptr = (__softboundcets_trie_entry_t*)address;
    return entry_ptr->lock;
@@ -1284,19 +1167,6 @@ __softboundcets_temporal_load_dereference_check(void* pointer_lock,
 #endif
 
 
-#ifdef __SBCETS_ASM_MODE_TCHK
-  __asm__("ictchk %0, %1\n\t"
-          :
-          : "r"(key), "r"(pointer_lock)
-          : "memory"
-          );
-
-  return;
-  
-#endif
-
-
-
 #ifdef __SBCETS_STATS_MODE
   __sbcets_stats_temporal_load_dereference_checks++;
 #endif
@@ -1342,21 +1212,6 @@ __WEAK_INLINE void
 __softboundcets_temporal_store_dereference_check(void* pointer_lock, 
                                                  size_t key){
 #endif    
-
-
-
-#ifdef __SBCETS_ASM_MODE_TCHK
-
-  __asm__("ictchk %0, %1\n\t"
-          :
-          : "r"(key), "r"(pointer_lock)
-          : "memory"
-          );
-
-  return;
-  
-#endif
-
 
 #ifdef __SBCETS_STATS_MODE
   __sbcets_stats_temporal_store_dereference_checks++;
