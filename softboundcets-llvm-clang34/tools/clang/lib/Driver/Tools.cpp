@@ -3098,6 +3098,14 @@ void Clang::ConstructJob(Compilation &C, const JobAction &JA,
     CmdArgs.push_back("-fsoftboundcets");
   }
 
+  if(Args.getLastArg(options::OPT_fsoftboundmpx)){
+    CmdArgs.push_back("-fsoftboundmpx");
+  }
+
+  if(Args.getLastArg(options::OPT_fsoftboundcetsmpx)){
+    CmdArgs.push_back("-fsoftboundcetsmpx");
+  }
+
   if (Args.getLastArg(options::OPT_fsoftboundcetsstore)) {
     CmdArgs.push_back("-fsoftboundcetsstore");
   }
@@ -5555,6 +5563,14 @@ void openbsd::Link::ConstructJob(Compilation &C, const JobAction &JA,
     CmdArgs.push_back("-lsoftboundcets_rt");
   }
 
+  if(Args.hasArg(options::OPT_fsoftboundmpx)){
+    CmdArgs.push_back("-lsoftboundmpx_rt");
+  }
+
+  if(Args.hasArg(options::OPT_fsoftboundcetsmpx)){
+    CmdArgs.push_back("-lsoftboundcetsmpx_rt");
+  }
+
   
   if (!Args.hasArg(options::OPT_nostdlib) &&
       !Args.hasArg(options::OPT_nodefaultlibs)) {
@@ -5947,6 +5963,15 @@ void freebsd::Link::ConstructJob(Compilation &C, const JobAction &JA,
   if (Args.hasArg(options::OPT_fsoftboundcets)){
     CmdArgs.push_back("-lsoftboundcets_rt");
   }
+
+  if(Args.hasArg(options::OPT_fsoftboundmpx)){
+    CmdArgs.push_back("-lsoftboundmpx_rt");
+  }
+
+  if(Args.hasArg(options::OPT_fsoftboundcetsmpx)){
+    CmdArgs.push_back("-lsoftboundcetsmpx_rt");
+  }
+
 
   if (!Args.hasArg(options::OPT_nostdlib) &&
       !Args.hasArg(options::OPT_nodefaultlibs)) {
@@ -6578,6 +6603,15 @@ void gnutools::Link::ConstructJob(Compilation &C, const JobAction &JA,
   if (Args.hasArg(options::OPT_fsoftboundcets)){
     CmdArgs.push_back("-lsoftboundcets_rt");
   }
+
+  if(Args.hasArg(options::OPT_fsoftboundmpx)){
+    CmdArgs.push_back("-lsoftboundmpx_rt");
+  }
+
+  if(Args.hasArg(options::OPT_fsoftboundcetsmpx)){
+    CmdArgs.push_back("-lsoftboundcetsmpx_rt");
+  }
+
 
 
   // Call these before we add the C++ ABI library.

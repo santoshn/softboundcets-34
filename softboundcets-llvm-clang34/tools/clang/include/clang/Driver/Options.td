@@ -536,6 +536,10 @@ def fgnu89_inline : Flag<["-"], "fgnu89-inline">, Group<f_Group>, Flags<[CC1Opti
   HelpText<"Use the gnu89 inline semantics">;
 def fsoftboundcets : Flag<["-"], "fsoftboundcets">, Group<f_Group>, Flags<[CC1Option]>,
   HelpText<"SoftBoundCETS Memory Checker">;
+def fsoftboundmpx : Flag<["-"], "fsoftboundmpx">, Group<f_Group>, Flags<[CC1Option]>,
+  HelpText<"SoftBoundMPX Spatial Memory Checker">;
+def fsoftboundcetsmpx : Flag<["-"], "fsoftboundcetsmpx">, Group<f_Group>, Flags<[CC1Option]>,
+  HelpText<"SoftBoundCETSMPX Spatial + Temporal MPX  Memory Checker">;
 def fno_gnu89_inline : Flag<["-"], "fno-gnu89-inline">, Group<f_Group>;
 def fgnu_runtime : Flag<["-"], "fgnu-runtime">, Group<f_Group>,
   HelpText<"Generate output compatible with the standard GNU Objective-C runtime">;

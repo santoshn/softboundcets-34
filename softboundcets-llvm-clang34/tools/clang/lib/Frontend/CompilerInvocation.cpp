@@ -451,6 +451,9 @@ static bool ParseCodeGenArgs(CodeGenOptions &Opts, ArgList &Args, InputKind IK,
   Opts.SoftBoundCETS = Args.hasArg(OPT_fsoftboundcets);
   Opts.SoftBoundCETSStore = Args.hasArg(OPT_fsoftboundcetsstore);
 
+  Opts.SoftBoundMPX = Args.hasArg(OPT_fsoftboundmpx);
+  Opts.SoftBoundCETSMPX = Args.hasArg(OPT_fsoftboundcetsmpx);
+
   Opts.SSPBufferSize =
       getLastArgIntValue(Args, OPT_stack_protector_buffer_size, 8, Diags);
   Opts.StackRealignment = Args.hasArg(OPT_mstackrealign);
