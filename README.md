@@ -68,3 +68,17 @@ Using SoftBoundCETS with LLVM+CLANG-3.4 on a x86-64 machine with Linux OS
       Enter 10; the program executes successfully.
 
       Enter 105; a memory safety violation is triggered.
+
+Some NOTES
+==========
+
+(1) LLVM/clang-3.4 introduces vectorization instructions in the IR
+(insertelement, extractelement, shufflevector) for structures and
+arrays with pointers, SoftBoundCETS still does not handle these
+instructions. If you see false violations, use -fno-vectorize in your
+flags to avoid memory safety violations. 
+
+(2) SoftBoundCETS-3.4 does not support checking variable argument
+functions. It is necessary to make these functions softbound defined
+to avoid false violations.
+

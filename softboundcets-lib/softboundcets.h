@@ -306,22 +306,7 @@ __WEAK_INLINE void __softboundcets_allocate_shadow_stack_space(int num_pointer_a
   size_t* prev_stack_size_ptr = __softboundcets_shadow_stack_ptr + 1;
   size_t prev_stack_size = *((size_t*)prev_stack_size_ptr);
 
-  if(__SOFTBOUNDCETS_SHADOW_STACK_DEBUG){
-    printf("[allocate_stack] shadow_stack_ptr = %p\n", 
-	   __softboundcets_shadow_stack_ptr);
-
-    printf("[allocate_stack] prev_stack_size = %zx\n", 
-	   prev_stack_size);
-    
-    printf("[allocate_stack] prev_stack_size_ptr = %p\n", 
-	   prev_stack_size_ptr);
-  }
-
   __softboundcets_shadow_stack_ptr = __softboundcets_shadow_stack_ptr + prev_stack_size + 2;
-
-  if(__SOFTBOUNDCETS_SHADOW_STACK_DEBUG){
-    printf("[allocate_stack] new_ptr = %p\n", __softboundcets_shadow_stack_ptr);
-  }
   
   *((size_t*) __softboundcets_shadow_stack_ptr) = prev_stack_size;
   size_t* current_stack_size_ptr = __softboundcets_shadow_stack_ptr + 1;
@@ -336,9 +321,6 @@ __WEAK_INLINE void* __softboundcets_load_base_shadow_stack(int arg_no){
   size_t* base_ptr = (__softboundcets_shadow_stack_ptr + count); 
   void* base = *((void**)base_ptr);
 
-  if(__SOFTBOUNDCETS_SHADOW_STACK_DEBUG){
-    printf("[load_base] loading base=%p from shadow_stack_ptr=%p\n", base, base_ptr);
-  }
   return base;
 }
 
@@ -350,9 +332,6 @@ __WEAK_INLINE void* __softboundcets_load_bound_shadow_stack(int arg_no){
 
   void* bound = *((void**)bound_ptr);
   
-  if(__SOFTBOUNDCETS_SHADOW_STACK_DEBUG){
-    printf("[load_bound] loading bound=%p from shadow_stack_ptr=%p\n", bound, bound_ptr);
-  }
   return bound;
 }
 
@@ -363,9 +342,6 @@ __WEAK_INLINE size_t __softboundcets_load_key_shadow_stack(int arg_no){
   size_t* key_ptr = (__softboundcets_shadow_stack_ptr + count); 
   size_t key = *key_ptr;
 
-  if(__SOFTBOUNDCETS_SHADOW_STACK_DEBUG){
-    printf("[load_key] loading key=%zx from shadow_stack_ptr=%p\n", key, key_ptr);
-  }
   return key;
 
 }
@@ -377,9 +353,6 @@ __WEAK_INLINE void* __softboundcets_load_lock_shadow_stack(int arg_no){
   size_t* lock_ptr = (__softboundcets_shadow_stack_ptr + count); 
   void* lock = *((void**)lock_ptr);
 
-  if(__SOFTBOUNDCETS_SHADOW_STACK_DEBUG){
-    printf("[load_lock] loading lock=%p from shadow_stack_ptr=%p\n", lock, lock_ptr);
-  }
   return lock;
 }
 
@@ -390,9 +363,6 @@ __WEAK_INLINE void __softboundcets_store_base_shadow_stack(void* base, int arg_n
   void** base_ptr = (void**)(__softboundcets_shadow_stack_ptr + count); 
 
   *(base_ptr) = base;
-  if(__SOFTBOUNDCETS_SHADOW_STACK_DEBUG){
-    printf("[store_base] storing base=%p from shadow_stack_ptr=%p\n", base, base_ptr);
-  }
 
 }
 
@@ -403,9 +373,6 @@ __WEAK_INLINE void __softboundcets_store_bound_shadow_stack(void* bound, int arg
   void** bound_ptr = (void**)(__softboundcets_shadow_stack_ptr + count); 
 
   *(bound_ptr) = bound;
-  if(__SOFTBOUNDCETS_SHADOW_STACK_DEBUG){  
-    printf("[store_bound] storing bound=%p from shadow_stack_ptr=%p\n", bound, bound_ptr);
-  }
 }
 
 __WEAK_INLINE void __softboundcets_store_key_shadow_stack(size_t key, int arg_no){
@@ -415,9 +382,6 @@ __WEAK_INLINE void __softboundcets_store_key_shadow_stack(size_t key, int arg_no
 
   *(key_ptr) = key;
 
-  if(__SOFTBOUNDCETS_SHADOW_STACK_DEBUG){
-    printf("[store_base] storing key=%zx from shadow_stack_ptr=%p\n", key, key_ptr);
-  }
 }
 
 
@@ -427,9 +391,6 @@ __WEAK_INLINE void __softboundcets_store_lock_shadow_stack(void* lock, int arg_n
   void** lock_ptr = (void**)(__softboundcets_shadow_stack_ptr + count); 
 
   *(lock_ptr) = lock;
-  if(__SOFTBOUNDCETS_SHADOW_STACK_DEBUG){
-    printf("[store_base] storing lock=%p from shadow_stack_ptr=%p\n", lock, lock_ptr);
-  }
 }
 
 __WEAK_INLINE void __softboundcets_deallocate_shadow_stack_space(){
@@ -440,18 +401,8 @@ __WEAK_INLINE void __softboundcets_deallocate_shadow_stack_space(){
 
   assert((read_value >=0 && read_value <= __SOFTBOUNDCETS_SHADOW_STACK_ENTRIES));
                                                 
-  size_t* prev_ptr;
-
-  if(__SOFTBOUNDCETS_SHADOW_STACK_DEBUG){
-    prev_ptr = __softboundcets_shadow_stack_ptr;
-  }
-
   __softboundcets_shadow_stack_ptr =  __softboundcets_shadow_stack_ptr - read_value - 2;
 
-  if(__SOFTBOUNDCETS_SHADOW_STACK_DEBUG){
-    printf("[deallocate] current_shadow_stack_ptr=%p, prev_stack_ptr=%p\n", 
-	   __softboundcets_shadow_stack_ptr, prev_ptr);
-  }
 }
 
 __WEAK_INLINE __softboundcets_trie_entry_t* __softboundcets_trie_allocate(){
@@ -664,10 +615,8 @@ __softboundcets_spatial_load_dereference_check(void *base, void *bound,
 
   if ((ptr < base) || ((void*)((char*) ptr + size_of_type) > bound)) {
 
-    if(__SOFTBOUNDCETS_DEBUG){
-      __softboundcets_printf("In LDC, base=%zx, bound=%zx, ptr=%zx\n", 
-			     base, bound, ptr);
-    }
+    __softboundcets_printf("In LDC, base=%zx, bound=%zx, ptr=%zx\n",
+    			   base, bound, ptr);    
     __softboundcets_abort();
   }
 }
@@ -689,12 +638,8 @@ __softboundcets_spatial_store_dereference_check(void *base,
   }      
 
   if ((ptr < base) || ((void*)((char*)ptr + size_of_type) > bound)) {
-    if(__SOFTBOUNDCETS_DEBUG) {
-      __softboundcets_printf("In Store Dereference Check, base=%p, bound=%p, ptr=%p, size_of_type=%zx, ptr+size=%p\n", 
-                             base, bound, ptr, size_of_type, (char*)ptr+size_of_type);
-    }
-    /* __softboundcets_printf("In Store Dereference Check, base=%p, bound=%p, ptr=%p, size_of_type=%zx, ptr+size=%p\n",
-                              base, bound, ptr, size_of_type, (char*)ptr+size_of_type); */
+    __softboundcets_printf("In Store Dereference Check, base=%p, bound=%p, ptr=%p, size_of_type=%zx, ptr+size=%p\n",
+                              base, bound, ptr, size_of_type, (char*)ptr+size_of_type); 
     
     __softboundcets_abort();
   }
