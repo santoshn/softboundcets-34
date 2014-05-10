@@ -400,6 +400,13 @@ void SoftBoundCETSPass::initializeSoftBoundVariables(Module& module) {
 
     }
   }
+
+  m_metadata_load_vector_func = module.getFunction("__softboundcets_metadata_load_vector");
+  assert(m_metadata_load_vector_func && "__softboundcets_metadata_load_vector null?");
+
+  m_metadata_store_vector_func = module.getFunction("__softboundcets_metadata_store_vector");
+  assert(m_metadata_store_vector_func && "__softboundcets_metadata_store_vector null?");
+  
   m_load_base_bound_func = module.getFunction("__softboundcets_metadata_load");
   assert(m_load_base_bound_func && "__softboundcets_metadata_load null?");
   
@@ -916,6 +923,9 @@ bool SoftBoundCETSPass::isFuncDefSoftBound(const std::string &str) {
     m_func_def_softbound["__softboundcets_memory_deallocation"] = true;
     m_func_def_softbound["__softboundcets_stack_memory_deallocation"] = true;
 
+    m_func_def_softbound["__softboundcets_metadata_load_vector"] = true;
+    m_func_def_softbound["__softboundcets_metadata_store_vector"] = true;
+    
     m_func_def_softbound["__softboundcets_metadata_load"] = true;
     m_func_def_softbound["__softboundcets_metadata_store"] = true;
     m_func_def_softbound["__hashProbeAddrOfPtr"] = true;
@@ -3784,7 +3794,63 @@ void SoftBoundCETSPass::handleAlloca (AllocaInst* alloca_inst,
     associateKeyLock(alloca_inst_value, alloca_key, alloca_lock);
   }
 }
-   
+
+
+void SoftBoundCETSPass::handleVectorStore(StoreInst* store_inst){
+
+  Value* operand = store_inst->getOperand(0);
+  Value* pointer_dest = store_inst->getOperand(1);
+  Instruction* insert_at = getNextInstruction(store_inst);
+
+  if(!m_vector_pointer_base.count(operand)){
+    assert(0 && "vector base not found");
+  }
+  if(!m_vector_pointer_bound.count(operand)){
+    assert(0 && "vector bound not found");
+  }
+  if(!m_vector_pointer_key.count(operand)){
+    assert(0 && "vector key not found");
+  }
+  
+  if(!m_vector_pointer_lock.count(operand)){
+    assert(0 && "vector lock not found");
+  }
+
+  Value* vector_base = m_vector_pointer_base[operand];
+  Value* vector_bound = m_vector_pointer_bound[operand];
+  Value* vector_key = m_vector_pointer_key[operand];
+  Value* vector_lock = m_vector_pointer_lock[operand];
+
+  const VectorType* vector_ty = dyn_cast<VectorType>(operand->getType());
+  uint64_t num_elements = vector_ty->getNumElements();
+  if (num_elements > 2){
+    assert(0 && "more than 2 element vectors not handled");
+  }
+
+  Value* pointer_operand_bitcast = castToVoidPtr(pointer_dest, insert_at);
+  for (uint64_t i = 0; i < num_elements; i++){
+
+    Constant* index = ConstantInt::get(Type::getInt32Ty(store_inst->getContext()), i);
+
+    Value* ptr_base = ExtractElementInst::Create(vector_base, index,"", insert_at);
+    Value* ptr_bound = ExtractElementInst::Create(vector_bound, index, "", insert_at);
+    Value* ptr_key = ExtractElementInst::Create(vector_key, index, "", insert_at);
+    Value* ptr_lock = ExtractElementInst::Create(vector_lock, index, "", insert_at);
+    
+    SmallVector<Value*, 8> args;
+    args.clear();
+
+    args.push_back(pointer_operand_bitcast);
+    args.push_back(ptr_base);
+    args.push_back(ptr_bound);
+    args.push_back(ptr_key);
+    args.push_back(ptr_lock);
+    args.push_back(index);
+
+    CallInst::Create(m_metadata_store_vector_func, args, "", insert_at);    
+  }
+
+}   
 
 void SoftBoundCETSPass::handleStore(StoreInst* store_inst) {
 
@@ -3792,6 +3858,14 @@ void SoftBoundCETSPass::handleStore(StoreInst* store_inst) {
   Value* pointer_dest = store_inst->getOperand(1);
   Instruction* insert_at = getNextInstruction(store_inst);
     
+  if(isa<VectorType>(operand->getType())){
+    const VectorType* vector_ty = dyn_cast<VectorType>(operand->getType());
+    if(isa<PointerType>(vector_ty->getElementType())){
+      handleVectorStore(store_inst);
+      return;
+    }    
+  }
+
   /* If a pointer is being stored, then the base and bound
    * corresponding to the pointer must be stored in the shadow space
    */
@@ -4016,6 +4090,10 @@ SoftBoundCETSPass:: iterateCallSiteIntroduceShadowStackStores(CallInst* call_ins
 
 void SoftBoundCETSPass::handleExtractValue(ExtractValueInst* EVI){
 
+  if(isa<PointerType>(EVI->getType())){
+    assert(0 && "ExtractValue is returning a pointer, possibly some vectorization going on, not handled, try running with O0 or O1 or O2");
+  }
+  
   if(spatial_safety){
     associateBaseBound(EVI, m_void_null_ptr, m_infinite_bound_ptr);
   }
@@ -4587,13 +4665,7 @@ bool SoftBoundCETSPass:: isByValDerived(Value* pointer_operand){
 }
 
 
-/* handleLoad Takes a load_inst If the load is through a pointer
- * which is a global then inserts base and bound for that global
- * Also if the loaded value is a pointer then loads the base and
- * bound for for the pointer from the shadow space
- */
-
-void SoftBoundCETSPass::handleLoad(LoadInst* load_inst) { 
+void SoftBoundCETSPass::insertMetadataLoad(LoadInst* load_inst){
 
   AllocaInst* base_alloca;
   AllocaInst* bound_alloca;
@@ -4602,59 +4674,6 @@ void SoftBoundCETSPass::handleLoad(LoadInst* load_inst) {
 
   SmallVector<Value*, 8> args;
 
-  if(!isa<PointerType>(load_inst->getType()))
-    return;
-
-  if(simple_metadata_mode){
-    
-    Value* pointer_operand = load_inst->getPointerOperand();
-    Instruction* insert_at = getNextInstruction(load_inst);
-
-    Value* pointer_operand_bitcast = castToVoidPtr(pointer_operand, insert_at);
-    args.clear();
-
-    args.push_back(pointer_operand_bitcast);
-
-    Value* map_inst = CallInst::Create(m_metadata_map_func, args, "", insert_at);
-
-    if(spatial_safety){
-      args.clear();
-      args.push_back(map_inst);    
-      Value* ptr_base = CallInst::Create(m_metadata_load_base_func, args, "", insert_at);
-      
-      args.clear();
-      args.push_back(map_inst);
-      Value* ptr_bound = CallInst::Create(m_metadata_load_bound_func, args, "", insert_at);
-      associateBaseBound(load_inst, ptr_base, ptr_bound);
-    }
-
-    if(temporal_safety){
-      args.clear();
-      args.push_back(map_inst);
-      Value* ptr_key = CallInst::Create(m_metadata_load_key_func, args, "", insert_at);
-      args.clear();
-      args.push_back(map_inst);
-      Value* ptr_lock = CallInst::Create(m_metadata_load_lock_func, args, "", insert_at);
-      associateKeyLock(load_inst, ptr_key, ptr_lock);
-    }
-    
-    return;
-  }
-
-
-#if 0
-  if(unsafe_byval_opt && isByValDerived(load_inst->getOperand(0))) {
-
-    if(spatial_safety){
-      associateBaseBound(load_inst, m_void_null_ptr, m_infinite_bound_ptr);
-    }
-    if(temporal_safety){
-      Value* func_lock = getAssociatedFuncLock(load_inst);
-      associateKeyLock(load_inst, m_constantint64ty_one, func_lock);
-    }
-    return;
-  }
-#endif
 
   Value* load_inst_value = load_inst;
   Value* pointer_operand = load_inst->getPointerOperand();
@@ -4706,6 +4725,151 @@ void SoftBoundCETSPass::handleLoad(LoadInst* load_inst) {
     Instruction* lock_load = new LoadInst(lock_alloca, "lock.load", insert_at);    
     associateKeyLock(load_inst_value, key_load, lock_load);
   }
+
+
+}
+
+
+/* handleLoad Takes a load_inst If the load is through a pointer
+ * which is a global then inserts base and bound for that global
+ * Also if the loaded value is a pointer then loads the base and
+ * bound for for the pointer from the shadow space
+ */
+
+void SoftBoundCETSPass::handleLoad(LoadInst* load_inst) { 
+
+
+  if(!isa<VectorType>(load_inst->getType()) && !isa<PointerType>(load_inst->getType())){
+    return;
+  }
+  
+  if(isa<PointerType>(load_inst->getType())){
+    insertMetadataLoad(load_inst);
+    return;
+  }
+ 
+  if(isa<VectorType>(load_inst->getType())){
+    
+    if(!spatial_safety || !temporal_safety){
+      assert(0 && "Loading and Storing Pointers as a first-class types");            
+      return;
+    }
+
+    
+    // It should be a vector if here
+    const VectorType* vector_ty = dyn_cast<VectorType>(load_inst->getType());
+    // Introduce a series of metadata loads and associated it pointers
+    if(!isa<PointerType>(vector_ty->getElementType()))
+       return;
+    
+    Value* load_inst_value = load_inst;
+    Instruction* load = load_inst;    
+
+    Value* pointer_operand = load_inst->getPointerOperand();
+    Instruction* insert_at = getNextInstruction(load_inst);
+        
+    Value* pointer_operand_bitcast =  castToVoidPtr(pointer_operand, insert_at);      
+    Instruction* first_inst_func = dyn_cast<Instruction>(load_inst->getParent()->getParent()->begin()->begin());
+    assert(first_inst_func && "function doesn't have any instruction and there is load???");
+   
+    uint64_t num_elements = vector_ty->getNumElements();
+
+    
+    SmallVector<Value*, 8> vector_base;
+    SmallVector<Value*, 8> vector_bound;
+    SmallVector<Value*, 8> vector_key;
+    SmallVector<Value*, 8> vector_lock;
+
+    for(uint64_t i = 0; i < num_elements; i++){
+
+      
+      AllocaInst* base_alloca;
+      AllocaInst* bound_alloca;
+      AllocaInst* key_alloca;
+      AllocaInst* lock_alloca;
+      
+      SmallVector<Value*, 8> args;
+      
+      args.push_back(pointer_operand_bitcast);
+      
+      base_alloca = new AllocaInst(m_void_ptr_type, "base.alloca", first_inst_func);
+      bound_alloca = new AllocaInst(m_void_ptr_type, "bound.alloca", first_inst_func);
+	 
+      /* base */
+      args.push_back(base_alloca);
+      /* bound */
+      args.push_back(bound_alloca);
+
+      key_alloca = new AllocaInst(Type::getInt64Ty(load_inst->getType()->getContext()), "key.alloca", first_inst_func);
+      lock_alloca = new AllocaInst(m_void_ptr_type, "lock.alloca", first_inst_func);
+      
+      args.push_back(key_alloca);
+      args.push_back(lock_alloca);
+  
+      Constant* index = ConstantInt::get(Type::getInt32Ty(load_inst->getContext()), i);
+
+      args.push_back(index);
+          
+      CallInst::Create(m_metadata_load_vector_func, args, "", insert_at);
+      
+      Instruction* base_load = new LoadInst(base_alloca, "base.load", insert_at);
+      Instruction* bound_load = new LoadInst(bound_alloca, "bound.load", insert_at);
+      Instruction* key_load = new LoadInst(key_alloca, "key.load", insert_at);
+      Instruction* lock_load = new LoadInst(lock_alloca, "lock.load", insert_at);    
+      
+      vector_base.push_back(base_load);
+      vector_bound.push_back(bound_load);
+      vector_key.push_back(key_load);
+      vector_lock.push_back(lock_load);      
+    }
+    
+    if (num_elements > 2){
+      assert(0 && "Loading and Storing Pointers as a first-class types with more than 2 elements");      
+    }
+    
+    VectorType* metadata_ptr_type = VectorType::get(m_void_ptr_type, num_elements);
+    VectorType* key_vector_type = VectorType::get(m_key_type, num_elements);
+    
+    Value *CV0 = ConstantInt::get(Type::getInt32Ty(load_inst->getContext()), 0);
+    Value *CV1 = ConstantInt::get(Type::getInt32Ty(load_inst->getContext()), 1);
+
+    Value* base_vector = InsertElementInst::Create(UndefValue::get(metadata_ptr_type),     vector_base[0],  CV0, "", insert_at);
+    Value* base_vector_final = InsertElementInst::Create(base_vector, vector_base[1], CV1, "", insert_at);
+  
+    m_vector_pointer_base[load_inst] = base_vector_final;
+
+    Value* bound_vector = InsertElementInst::Create(UndefValue::get(metadata_ptr_type),     vector_bound[0],  CV0, "", insert_at);
+    Value* bound_vector_final = InsertElementInst::Create(bound_vector, vector_bound[1], CV1, "", insert_at);    
+    m_vector_pointer_bound[load_inst] = bound_vector_final;
+
+
+    Value* key_vector = InsertElementInst::Create(UndefValue::get(key_vector_type), vector_key[0], CV0, "", insert_at);
+    Value* key_vector_final = InsertElementInst::Create(key_vector, vector_key[1], CV1, "", insert_at);
+    m_vector_pointer_key[load_inst] = key_vector_final;
+
+
+    Value* lock_vector = InsertElementInst::Create(UndefValue::get(metadata_ptr_type),     vector_lock[0],  CV0, "", insert_at);
+    Value* lock_vector_final = InsertElementInst::Create(lock_vector, vector_lock[1], CV1, "", insert_at);    
+
+    m_vector_pointer_lock[load_inst] = lock_vector_final;
+    
+    return;
+  }
+
+#if 0
+  if(unsafe_byval_opt && isByValDerived(load_inst->getOperand(0))) {
+
+    if(spatial_safety){
+      associateBaseBound(load_inst, m_void_null_ptr, m_infinite_bound_ptr);
+    }
+    if(temporal_safety){
+      Value* func_lock = getAssociatedFuncLock(load_inst);
+      associateKeyLock(load_inst, m_constantint64ty_one, func_lock);
+    }
+    return;
+  }
+#endif
+
 }
 
 

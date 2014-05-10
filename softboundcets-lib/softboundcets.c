@@ -1,5 +1,5 @@
 //=== softboundcets.c - Creates the main function for SoftBound+CETS Runtime --*- C -*===// 
-// Copyright (c) 2013 Santosh Nagarakatte, Milo M. K. Martin. All rights reserved.
+// Copyright (c) 2014 Santosh Nagarakatte, Milo M. K. Martin. All rights reserved.
 
 // Developed by: Santosh Nagarakatte,
 //               Department of Computer Science, Rutgers University
@@ -68,22 +68,7 @@ size_t* __softboundcets_lock_next_location = NULL;
 size_t* __softboundcets_lock_new_location = NULL;
 size_t __softboundcets_key_id_counter = 2;
 
-#ifdef __SBCETS_STATS_MODE
-size_t __sbcets_stats_memcpy_checks = 0;
-size_t __sbcets_stats_metadata_memcopies = 0;
-size_t __sbcets_stats_spatial_load_dereference_checks = 0;
-size_t __sbcets_stats_spatial_store_dereference_checks = 0;
-size_t __sbcets_stats_temporal_load_dereference_checks = 0;
-size_t __sbcets_stats_temporal_store_dereference_checks = 0;
-size_t __sbcets_stats_metadata_loads = 0;
-size_t __sbcets_stats_metadata_stores = 0;
-size_t __sbcets_stats_heap_allocations = 0;
-size_t __sbcets_stats_stack_allocations = 0;
-size_t __sbcets_stats_heap_deallocations = 0;
-size_t __sbcets_stats_stack_deallocations = 0;
-#endif
-
-/* key 0 means not used, 1 means globals*/
+/* key 0 means not used, 1 is for  globals*/
 size_t __softboundcets_deref_check_count = 0;
 size_t* __softboundcets_global_lock = 0;
 
@@ -91,61 +76,6 @@ size_t* __softboundcets_temporal_space_begin = 0;
 size_t* __softboundcets_stack_temporal_space_begin = NULL;
 
 void* malloc_address = NULL;
-
-#ifdef __SBCETS_STATS_MODE
-
-static __attribute__ ((__destructor__))
-void __sbcets_stats_fini() {
-
-  // 4kB page size, 1024*1024 bytes per MB,
-  const double MULTIPLIER = 4096.0/(1024.0*1024.0); 
-  FILE* proc_file, *statistics_file;
-  size_t total_size_in_pages = 0;
-  size_t res_size_in_pages = 0;
-
-  statistics_file = fopen("bench_statistics.log", "w");
-  assert(statistics_file != NULL);
-
-  proc_file = fopen("/proc/self/statm", "r");
-  fscanf(proc_file, "%zd %zd", &total_size_in_pages, &res_size_in_pages);
-
-  fprintf(statistics_file, "memory_total: %lf \n", total_size_in_pages*MULTIPLIER);
-  fprintf(statistics_file, "memory_resident: %lf \n", res_size_in_pages*MULTIPLIER);
-
-  fprintf(statistics_file, "Num_spatial_load_checks:%zd\n",
-          __sbcets_stats_spatial_load_dereference_checks);
-  fprintf(statistics_file,  "Num_spatial_store_checks:%zd\n", 
-          __sbcets_stats_spatial_store_dereference_checks);
-  fprintf(statistics_file,  "Num_temporal_load_checks:%zd\n", 
-          __sbcets_stats_temporal_load_dereference_checks);
-  fprintf(statistics_file,  "Num_temporal_store_checks:%zd\n", 
-          __sbcets_stats_temporal_store_dereference_checks);  
-  fprintf(statistics_file, "Num_metadata_loads:%zd\n",
-          __sbcets_stats_metadata_loads);
-  fprintf(statistics_file, "Num_metadata_stores:%zd\n",
-          __sbcets_stats_metadata_stores);
-  fprintf(statistics_file, "Num_heap_allocations:%zd\n",
-          __sbcets_stats_heap_allocations);
-  fprintf(statistics_file, "Num_stack_allocations:%zd\n",
-          __sbcets_stats_stack_allocations);
-  fprintf(statistics_file, "Num_heap_deallocations:%zd\n",
-          __sbcets_stats_heap_deallocations);
-  fprintf(statistics_file, "Num_stack_deallocations:%zd\n",
-          __sbcets_stats_stack_deallocations);
-  fprintf(statistics_file, "Num_metadata_memcopies:%zd\n",
-          __sbcets_stats_metadata_memcopies);
- fprintf(statistics_file, "Num_memcpy_checks:%zd\n",
-          __sbcets_stats_memcpy_checks);
- 
-
-  fprintf(statistics_file, 
-          "============================================\n");
-  fclose(statistics_file);
-  
-}
-
-#endif
-
 
 __SOFTBOUNDCETS_NORETURN void __softboundcets_abort()
 {
@@ -170,17 +100,8 @@ static int softboundcets_initialized = 0;
 __NO_INLINE void __softboundcets_stub(void) {
   return;
 }
-void __softboundcets_init( int is_trie) 
+void __softboundcets_init(void) 
 {
-  if (__SOFTBOUNDCETS_DEBUG) {
-    __softboundcets_printf("Running __softboundcets_init for module\n");
-  }
-  
-  if (is_trie != __SOFTBOUNDCETS_TRIE) {
-    __softboundcets_printf("Softboundcets: Inconsistent specification of metadata encoding\n");
-    abort();
-  }
-
   if (softboundcets_initialized != 0) {
     return;  // already initialized, do nothing
   }
@@ -191,10 +112,8 @@ void __softboundcets_init( int is_trie)
     __softboundcets_printf("Initializing softboundcets metadata space\n");
   }
 
-  if(__SOFTBOUNDCETS_TRIE){
-    assert(sizeof(__softboundcets_trie_entry_t) >= 16);
-  }
-
+  
+  assert(sizeof(__softboundcets_trie_entry_t) >= 16);
 
   /* Allocating the temporal shadow space */
 
@@ -235,10 +154,6 @@ void __softboundcets_init( int is_trie)
   size_t * current_size_shadow_stack_ptr =  __softboundcets_shadow_stack_ptr +1 ;
   *(current_size_shadow_stack_ptr) = 0;
 
-  if(__SOFTBOUNDCETS_SHADOW_STACK_DEBUG){
-    printf("[mmap_shadow_stack]mmaped shadowstack pointer = %p\n", 
-           __softboundcets_shadow_stack_ptr);
-  }
 
   if(__SOFTBOUNDCETS_FREE_MAP) {
     size_t length_free_map = (__SOFTBOUNDCETS_N_FREE_MAP_ENTRIES) * sizeof(size_t);
@@ -248,20 +163,16 @@ void __softboundcets_init( int is_trie)
     assert(__softboundcets_free_map_table != (void*) -1);
   }
 
-  if(__SOFTBOUNDCETS_TRIE) {
-    size_t length_trie = (__SOFTBOUNDCETS_TRIE_PRIMARY_TABLE_ENTRIES) * sizeof(__softboundcets_trie_entry_t*);
 
-    __softboundcets_trie_primary_table = mmap(0, length_trie, 
-                                              PROT_READ| PROT_WRITE, 
-                                              SOFTBOUNDCETS_MMAP_FLAGS, -1, 0);
-    assert(__softboundcets_trie_primary_table != (void *)-1);  
-    
-    int* temp = malloc(1);
-    __softboundcets_allocation_secondary_trie_allocate_range(0, (size_t)temp);
-    
-    return;
-  }
-
+  size_t length_trie = (__SOFTBOUNDCETS_TRIE_PRIMARY_TABLE_ENTRIES) * sizeof(__softboundcets_trie_entry_t*);
+  
+  __softboundcets_trie_primary_table = mmap(0, length_trie, 
+					    PROT_READ| PROT_WRITE, 
+					    SOFTBOUNDCETS_MMAP_FLAGS, -1, 0);
+  assert(__softboundcets_trie_primary_table != (void *)-1);  
+  
+  int* temp = malloc(1);
+  __softboundcets_allocation_secondary_trie_allocate_range(0, (size_t)temp);
 
 }
 

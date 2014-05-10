@@ -1,5 +1,5 @@
 //=== SoftBound/SoftBoundCETSPass.h - Definitions for the SoftBound/CETS --*- C++ -*===// 
-// Copyright (c) 2011 Santosh Nagarakatte, Milo M. K. Martin. All rights reserved.
+// Copyright (c) 2014 Santosh Nagarakatte, Milo M. K. Martin. All rights reserved.
 
 // Developed by: Santosh Nagarakatte, Milo M.K. Martin,
 //               Jianzhou Zhao, Steve Zdancewic
@@ -155,6 +155,9 @@ class SoftBoundCETSPass: public ModulePass {
    * a given pointer 
    */
   Function* m_load_base_bound_func;
+  Function* m_metadata_load_vector_func;
+  Function* m_metadata_store_vector_func;
+  
 
   /* Function Type of the function that stores the base and bound
    * for a given pointer
@@ -200,11 +203,20 @@ class SoftBoundCETSPass: public ModulePass {
    */
   std::map<Value*, int> m_is_pointer;
   std::map<Value*, Value*> m_pointer_base;
+
+  std::map<Value*, Value*> m_vector_pointer_base;
+  std::map<Value*, Value*> m_vector_pointer_bound;
+
+
   std::map<Value*, Value*> m_pointer_bound;
   std::map<Value*, BasicBlock*> m_faulting_block;
 
     
   /* key associated with pointer */
+
+  std::map<Value*, Value*> m_vector_pointer_key;
+  std::map<Value*, Value*> m_vector_pointer_lock;
+
   std::map<Value*, Value*> m_pointer_key;
   /* address of the location to load the key from */
   std::map<Value*, Value*> m_pointer_lock;  
@@ -262,7 +274,9 @@ class SoftBoundCETSPass: public ModulePass {
                     Value*, BasicBlock*,  
                     BasicBlock::iterator&);  
   
+  void insertMetadataLoad(LoadInst*);
   void handleLoad(LoadInst*);
+  void handleVectorStore(StoreInst*);
   void handleStore(StoreInst*);
   void handleGEP(GetElementPtrInst*);
 

@@ -1,5 +1,5 @@
-//=== SoftBound/InitializeSoftBound.cpp - Helper Pass for SoftBound/CETS --*- C++ -*===// 
-// Copyright (c) 2011 Santosh Nagarakatte, Milo M. K. Martin. All rights reserved.
+//=== SoftBoundCETS/InitializeSoftBound.cpp - Helper Pass for SoftBound/CETS --*- C++ -*===// 
+// Copyright (c) 2014 Santosh Nagarakatte, Milo M. K. Martin. All rights reserved.
 
 // Developed by: Santosh Nagarakatte, Milo M.K. Martin,
 //               Jianzhou Zhao, Steve Zdancewic
@@ -143,6 +143,16 @@ void InitializeSoftBoundCETS:: constructMetadataHandlers(Module & module){
 
     module.getOrInsertFunction("__softboundcets_metadata_load_lock",
                                VoidPtrTy, VoidPtrTy, NULL);
+
+    module.getOrInsertFunction("__softboundcets_metadata_load_vector", 
+                               VoidTy, VoidPtrTy, PtrVoidPtrTy, PtrVoidPtrTy, 
+                               PtrSizeTy, PtrVoidPtrTy, Int32Ty, NULL);
+
+    module.getOrInsertFunction("__softboundcets_metadata_store_vector", 
+                               VoidTy, VoidPtrTy, VoidPtrTy, 
+                               VoidPtrTy, SizeTy, VoidPtrTy, Int32Ty, NULL);
+
+    
     
     module.getOrInsertFunction("__softboundcets_metadata_load", 
                                VoidTy, VoidPtrTy, PtrVoidPtrTy, PtrVoidPtrTy, 
