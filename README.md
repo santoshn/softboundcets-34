@@ -69,6 +69,20 @@ Using SoftBoundCETS with LLVM+CLANG-3.4 on a x86-64 machine with Linux OS
 
       Enter 105; a memory safety violation is triggered.
 
+
+6. Avoiding checking with specific function by providing a sanitizer black list file
+
+   1. Create a file with list of functions as specified below. Lets
+   say we create a file list.txt with following entries
+  
+      fun:parseargs
+      fun:temp_test
+
+   2. Run clang with -fsanitize-blacklist=list.txt along with the
+   above SoftBoundCETS flags. The SoftBoundCETS pass will not add
+   checks for the functions in list.txt (in the example above: it is
+   parseargs and temp_test)
+
 Some NOTES
 ==========
 

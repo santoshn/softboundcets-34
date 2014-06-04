@@ -1,12 +1,17 @@
 //=== SoftBound/SoftBoundCETSPass.h - Definitions for the SoftBound/CETS --*- C++ -*===// 
 // Copyright (c) 2014 Santosh Nagarakatte, Milo M. K. Martin. All rights reserved.
-
-// Developed by: Santosh Nagarakatte, Milo M.K. Martin,
-//               Jianzhou Zhao, Steve Zdancewic
-//               Department of Computer and Information Sciences,
+//
+// Developed by: Santosh Nagarakatte, 
+//               Department of Computer Science,
+//               Rutgers University
+//               http://www.cs.rutgers.edu/~santosh.nagarakatte/softbound/
+//               
+//               in collaboration with
+//               Milo Martin, Jianzhou Zhao, Steve Zdancewic
 //               University of Pennsylvania
-//               http://www.cis.upenn.edu/acg/softbound/
-
+//
+//
+//
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to
 // deal with the Software without restriction, including without limitation the
@@ -22,10 +27,10 @@
 //      documentation and/or other materials provided with the distribution.
 
 //   3. Neither the names of Santosh Nagarakatte, Milo M. K. Martin,
-//      Jianzhou Zhao, Steve Zdancewic, University of Pennsylvania, nor
-//      the names of its contributors may be used to endorse or promote
-//      products derived from this Software without specific prior
-//      written permission.
+//      Jianzhou Zhao, Steve Zdancewic, University of Pennsylvania,
+//      Rutgers University, nor the names of its contributors may be
+//      used to endorse or promote products derived from this Software
+//      without specific prior written permission.
 
 // THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 // IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
@@ -99,6 +104,7 @@
 #include "llvm/Support/InstIterator.h"
 #include "llvm/Target/TargetLibraryInfo.h"
 #include "llvm/Support/TargetFolder.h"
+#include "llvm/Transforms/Utils/SpecialCaseList.h"
 
 
 #include<queue>
@@ -113,7 +119,9 @@ class SoftBoundCETSPass: public ModulePass {
   const DataLayout *TD;
   const TargetLibraryInfo *TLI;
   BuilderTy *Builder;
-  
+  SmallString<64> BlacklistFile;
+  OwningPtr<SpecialCaseList> Blacklist;
+
   bool spatial_safety;
   bool temporal_safety;
   
@@ -465,7 +473,9 @@ class SoftBoundCETSPass: public ModulePass {
   /*               "SoftBound CETS for memory safety", false, false) */
     
     
- SoftBoundCETSPass(): ModulePass(ID){
+ SoftBoundCETSPass(StringRef BlacklistFile = "")
+   : ModulePass(ID),
+    BlacklistFile(BlacklistFile){
     spatial_safety= true;
     temporal_safety=true;
 #if 0

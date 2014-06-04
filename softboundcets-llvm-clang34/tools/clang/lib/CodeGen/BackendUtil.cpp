@@ -227,6 +227,21 @@ static void addDataFlowSanitizerPass(const PassManagerBuilder &Builder,
   PM.add(createDataFlowSanitizerPass(CGOpts.SanitizerBlacklistFile));
 }
 
+static void addSoftBoundCETSPasses(const PassManagerBuilder &Builder, 
+				   PassManagerBase &PM) {
+  
+  const PassManagerBuilderWrapper &BuilderWrapper = 
+    static_cast<const PassManagerBuilderWrapper&>(Builder);
+  const CodeGenOptions &CGOpts = BuilderWrapper.getCGOpts();
+
+  PM.add(new DominatorTree());
+  PM.add(new LoopInfo());
+  PM.add(new FixByValAttributesPass());
+  PM.add(new InitializeSoftBoundCETS());
+  PM.add(new SoftBoundCETSPass(CGOpts.SanitizerBlacklistFile));
+
+}
+
 void EmitAssemblyHelper::CreatePasses(TargetMachine *TM) {
   unsigned OptLevel = CodeGenOpts.OptimizationLevel;
   CodeGenOptions::InliningMethod Inlining = CodeGenOpts.getInlining();
@@ -298,6 +313,14 @@ void EmitAssemblyHelper::CreatePasses(TargetMachine *TM) {
                            addDataFlowSanitizerPass);
   }
 
+
+  if(CodeGenOpts.SoftBoundCETS){
+    PMBuilder.addExtension(PassManagerBuilder::EP_OptimizerLast,
+			   addSoftBoundCETSPasses);
+    PMBuilder.addExtension(PassManagerBuilder::EP_EnabledOnOptLevel0,
+			   addSoftBoundCETSPasses);
+  }
+
   // Figure out TargetLibraryInfo.
   Triple TargetTriple(TheModule->getTargetTriple());
   PMBuilder.LibraryInfo = new TargetLibraryInfo(TargetTriple);
@@ -356,19 +379,19 @@ void EmitAssemblyHelper::CreatePasses(TargetMachine *TM) {
 
   PMBuilder.populateModulePassManager(*MPM);
 
-  if(CodeGenOpts.SoftBoundCETS){
-    MPM->add(new DominatorTree());
-    MPM->add(new LoopInfo());
-    //    MPM->add(new ScalarEvolution());
-    MPM->add(new FixByValAttributesPass());
-    MPM->add(new InitializeSoftBoundCETS());
-    MPM->add(new SoftBoundCETSPass());    
-  }
+  // if(CodeGenOpts.SoftBoundCETS){
+  //   MPM->add(new DominatorTree());
+  //   MPM->add(new LoopInfo());
+  //   //    MPM->add(new ScalarEvolution());
+  //   MPM->add(new FixByValAttributesPass());
+  //   MPM->add(new InitializeSoftBoundCETS());
+  //   MPM->add(new SoftBoundCETSPass());    
+  // }
 
-  if(CodeGenOpts.SoftBoundCETSStore){
+  // if(CodeGenOpts.SoftBoundCETSStore){
 
 
-  }
+  // }
   PMBuilder.populateModulePassManager(*MPM);
 
 }

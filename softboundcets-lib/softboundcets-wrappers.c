@@ -2033,7 +2033,7 @@ softboundcets___ctype_b_loc(void) {
   unsigned short const** ret_ptr =__ctype_b_loc();
   __softboundcets_store_return_metadata((void*) ret_ptr, 
                                         (void*)
-                                        ((char*) ret_ptr + sizeof(int*)), 
+                                        ((char*) ret_ptr + 1024*1024), 
                                         1, __softboundcets_global_lock);
   return ret_ptr;
 }
@@ -2043,7 +2043,7 @@ __WEAK_INLINE int const**  softboundcets___ctype_toupper_loc(void) {
   int const ** ret_ptr  =  __ctype_toupper_loc();  
   __softboundcets_store_return_metadata((void*) ret_ptr, 
                                         (void*)
-                                        ((char*)ret_ptr + sizeof(int*)), 
+                                        ((char*)ret_ptr + 1024*1024), 
                                         1, __softboundcets_global_lock);
   return ret_ptr;
 
@@ -2054,7 +2054,7 @@ __WEAK_INLINE int const**  softboundcets___ctype_tolower_loc(void) {
   
   int const ** ret_ptr  =  __ctype_tolower_loc();  
   __softboundcets_store_return_metadata((void*) ret_ptr, 
-                                        (void*) ((char*)ret_ptr + sizeof(int*)),
+                                        (void*) ((char*)ret_ptr + 1024*1024),
                                         1, __softboundcets_global_lock);
   return ret_ptr;
 
