@@ -76,6 +76,7 @@ Using SoftBoundCETS with LLVM+CLANG-3.4 on a x86-64 machine with Linux OS
    say we create a file list.txt with following entries
   
       fun:parseargs
+
       fun:temp_test
 
    2. Run clang with -fsanitize-blacklist=list.txt along with the
