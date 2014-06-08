@@ -392,7 +392,7 @@ void EmitAssemblyHelper::CreatePasses(TargetMachine *TM) {
 
 
   // }
-  PMBuilder.populateModulePassManager(*MPM);
+  // PMBuilder.populateModulePassManager(*MPM);
 
 }
 

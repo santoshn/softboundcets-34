@@ -844,7 +844,7 @@ bool SoftBoundCETSPass::isFuncDefSoftBound(const std::string &str) {
     m_func_wrappers_available["abort"] = true;
     m_func_wrappers_available["rand"] = true;
     m_func_wrappers_available["atoi"] = true;
-    m_func_wrappers_available["puts"] = true;
+    //m_func_wrappers_available["puts"] = true;
     m_func_wrappers_available["exit"] = true;
     m_func_wrappers_available["strtok"] = true;
     m_func_wrappers_available["strdup"] = true;
@@ -890,6 +890,7 @@ bool SoftBoundCETSPass::isFuncDefSoftBound(const std::string &str) {
     m_func_wrappers_available["__ctype_tolower_loc"] = true;
     m_func_wrappers_available["qsort"] = true;
 
+    m_func_def_softbound["puts"] = true;
     m_func_def_softbound["__softboundcets_intermediate"]= true;
     m_func_def_softbound["__softboundcets_dummy"] = true;
     m_func_def_softbound["__softboundcets_print_metadata"] = true;
@@ -4145,6 +4146,10 @@ void SoftBoundCETSPass::handleCall(CallInst* call_inst) {
 
   if(func && isFuncDefSoftBound(func->getName())){
 
+    if(!isa<PointerType>(call_inst->getType())){
+      return;
+    }
+    
     if(spatial_safety){
       associateBaseBound(call_inst, m_void_null_ptr, m_void_null_ptr);
     }

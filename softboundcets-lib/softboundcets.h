@@ -268,7 +268,6 @@ __WEAK_INLINE void* __softboundcets_load_base_shadow_stack(int arg_no){
   size_t count = 2 +  arg_no * __SOFTBOUNDCETS_METADATA_NUM_FIELDS + __BASE_INDEX ;
   size_t* base_ptr = (__softboundcets_shadow_stack_ptr + count); 
   void* base = *((void**)base_ptr);
-
   return base;
 }
 
@@ -279,7 +278,6 @@ __WEAK_INLINE void* __softboundcets_load_bound_shadow_stack(int arg_no){
   size_t* bound_ptr = (__softboundcets_shadow_stack_ptr + count); 
 
   void* bound = *((void**)bound_ptr);
-  
   return bound;
 }
 
@@ -289,9 +287,7 @@ __WEAK_INLINE size_t __softboundcets_load_key_shadow_stack(int arg_no){
   size_t count = 2 + arg_no * __SOFTBOUNDCETS_METADATA_NUM_FIELDS  + __KEY_INDEX ;
   size_t* key_ptr = (__softboundcets_shadow_stack_ptr + count); 
   size_t key = *key_ptr;
-
   return key;
-
 }
 
 __WEAK_INLINE void* __softboundcets_load_lock_shadow_stack(int arg_no){
@@ -300,7 +296,6 @@ __WEAK_INLINE void* __softboundcets_load_lock_shadow_stack(int arg_no){
   size_t count = 2 + arg_no * __SOFTBOUNDCETS_METADATA_NUM_FIELDS + __LOCK_INDEX;
   size_t* lock_ptr = (__softboundcets_shadow_stack_ptr + count); 
   void* lock = *((void**)lock_ptr);
-
   return lock;
 }
 
@@ -350,7 +345,6 @@ __WEAK_INLINE void __softboundcets_deallocate_shadow_stack_space(){
   assert((read_value >=0 && read_value <= __SOFTBOUNDCETS_SHADOW_STACK_ENTRIES));
                                                 
   __softboundcets_shadow_stack_ptr =  __softboundcets_shadow_stack_ptr - read_value - 2;
-
 }
 
 __WEAK_INLINE __softboundcets_trie_entry_t* __softboundcets_trie_allocate(){
@@ -542,7 +536,6 @@ __softboundcets_spatial_load_dereference_check(void *base, void *bound,
                                                void *ptr, size_t size_of_type)
 {
 
-
   if ((ptr < base) || ((void*)((char*) ptr + size_of_type) > bound)) {
 
     __softboundcets_printf("In LDC, base=%zx, bound=%zx, ptr=%zx\n",
@@ -558,7 +551,7 @@ __softboundcets_spatial_store_dereference_check(void *base,
                                                 void *ptr, 
                                                 size_t size_of_type)
 {
-
+  
   if ((ptr < base) || ((void*)((char*)ptr + size_of_type) > bound)) {
     __softboundcets_printf("In Store Dereference Check, base=%p, bound=%p, ptr=%p, size_of_type=%zx, ptr+size=%p\n",
                               base, bound, ptr, size_of_type, (char*)ptr+size_of_type); 
@@ -919,6 +912,7 @@ __METADATA_INLINE void __softboundcets_metadata_load(void* addr_of_ptr, void** b
 
   if(!__SOFTBOUNDCETS_PREALLOCATE_TRIE) {      
     if(trie_secondary_table == NULL) {  
+
 #ifdef __SOFTBOUNDCETS_SPATIAL
       *((void**) base) = 0;
       *((void**) bound) = 0;
@@ -951,7 +945,6 @@ __METADATA_INLINE void __softboundcets_metadata_load(void* addr_of_ptr, void** b
   *((void**) base) = entry_ptr->base;
   *((void**) bound) = entry_ptr->bound;
 
-  //      __softboundcets_printf("[metadata_load] addr_of_ptr=%p, base=%p, bound=%p, primary_index=%zx, secondary_index=%zx, trie_entry_addr=%p\n", addr_of_ptr, entry_ptr->base, entry_ptr->bound, primary_index, secondary_index, entry_ptr);
 #elif __SOFTBOUNDCETS_TEMPORAL
   *((size_t*) key) = entry_ptr->key;
   *((void**) lock) = (void*) entry_ptr->lock;
@@ -964,7 +957,7 @@ __METADATA_INLINE void __softboundcets_metadata_load(void* addr_of_ptr, void** b
   *((void**) lock) = (void*) entry_ptr->lock;
       
 #else
-
+  
   *((void**) base) = entry_ptr->base;
   *((void**) bound) = entry_ptr->bound;
   *((size_t*) key) = entry_ptr->key;

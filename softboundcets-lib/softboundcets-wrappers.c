@@ -1692,7 +1692,6 @@ __WEAK_INLINE void* softboundcets_malloc(size_t size) {
        //      __softboundcets_add_to_free_map(ptr_key, ret_ptr);
     }
   }
-
   return ret_ptr;
 }
 
