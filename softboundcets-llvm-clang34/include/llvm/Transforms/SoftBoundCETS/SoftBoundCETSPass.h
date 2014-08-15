@@ -295,6 +295,7 @@ class SoftBoundCETSPass: public ModulePass {
   void handleMemcpy(CallInst*);
   void handleIndirectCall(CallInst*);
   void handleExtractValue(ExtractValueInst*);
+  void handleExtractElement(ExtractElementInst*);
   void handleSelect(SelectInst*, int);
   void handleIntToPtr(IntToPtrInst*);
   void identifyFuncToTrans(Module&);

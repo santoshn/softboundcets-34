@@ -4095,6 +4095,43 @@ SoftBoundCETSPass:: iterateCallSiteIntroduceShadowStackStores(CallInst* call_ins
   }    
 }
 
+void SoftBoundCETSPass::handleExtractElement(ExtractElementInst* EEI){
+  
+  if(!isa<PointerType>(EEI->getType()))
+     return;
+  
+  Value* EEIOperand = EEI->getOperand(0);
+  
+  if(isa<VectorType>(EEIOperand->getType())){
+    
+    if(!m_vector_pointer_lock.count(EEIOperand) ||
+       !m_vector_pointer_base.count(EEIOperand) ||
+       !m_vector_pointer_bound.count(EEIOperand) || 
+       !m_vector_pointer_key.count(EEIOperand)){
+      assert(0 && "Extract element does not have vector metadata");
+    }
+
+    Constant* index = dyn_cast<Constant>(EEI->getOperand(1));
+    
+    Value* vector_base = m_vector_pointer_base[EEIOperand];
+    Value* vector_bound = m_vector_pointer_bound[EEIOperand];
+    Value* vector_key = m_vector_pointer_key[EEIOperand];
+    Value* vector_lock = m_vector_pointer_lock[EEIOperand];
+    
+    Value* ptr_base = ExtractElementInst::Create(vector_base, index, "", EEI);
+    Value* ptr_bound = ExtractElementInst::Create(vector_bound, index, "", EEI);
+    Value* ptr_key = ExtractElementInst::Create(vector_key, index, "", EEI);
+    Value* ptr_lock = ExtractElementInst::Create(vector_lock, index, "", EEI);
+    
+    associateBaseBound(EEI, ptr_base, ptr_bound);
+    associateKeyLock(EEI, ptr_key, ptr_lock);
+    return;
+  }
+     
+  assert (0 && "ExtractElement is returning a pointer, possibly some vectorization going on, not handled, try running with O0 or O1 or O2");    
+     
+}
+
 
 void SoftBoundCETSPass::handleExtractValue(ExtractValueInst* EVI){
 
@@ -4593,11 +4630,19 @@ void SoftBoundCETSPass::gatherBaseBoundPass1 (Function * func) {
           handleReturnInst(ret);
         }
         break;
+	
+      case Instruction::ExtractElement:
+	{
+	  ExtractElementInst * EEI = dyn_cast<ExtractElementInst>(v1);
+	  assert(EEI && "ExtractElementInst inst?");
+	  handleExtractElement(EEI);
+	}
+	break;
 
       case Instruction::ExtractValue:
 	{
 	  ExtractValueInst * EVI = dyn_cast<ExtractValueInst>(v1);
-	  assert(EVI && "hanlde extract value inst?");
+	  assert(EVI && "handle extract value inst?");
 	  handleExtractValue(EVI);
 	}
 	break;
