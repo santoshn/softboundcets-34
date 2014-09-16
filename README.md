@@ -58,8 +58,8 @@ Using SoftBoundCETS with LLVM+CLANG-3.4 on a x86-64 machine with Linux OS
    1. Compile
 
             cd tests
-            clang -fsoftboundcets test.c -o test -L<git_repo>/softboundcets-lib -lm
-            clang -fsoftboundcets -flto test.c -o test-lto -L<git_repo>/softboundcets-lib/lto -lm
+            clang -fsoftboundcets test.c -o test -L<git_repo>/softboundcets-lib -lm -lrt
+            clang -fsoftboundcets -flto test.c -o test-lto -L<git_repo>/softboundcets-lib/lto -lm -lrt
 
    2. Run the test program
 
